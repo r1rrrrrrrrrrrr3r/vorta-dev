@@ -239,7 +239,7 @@ include __DIR__ . '/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>vorta Productivity Tracker - Attendance</title>
+    <title>Vorta Prodtracker - Attendance</title>
     <link rel="stylesheet" href="css/output.css">
 </head>
 

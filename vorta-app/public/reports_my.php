@@ -53,7 +53,7 @@ include __DIR__ . '/header.php';
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>vorta Prodtracker - Report My</title>
+  <title>Vorta Prodtracker - Report My</title>
   <link rel="stylesheet" href="css/output.css">
 </head>
 

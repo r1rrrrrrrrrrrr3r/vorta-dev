@@ -80,7 +80,7 @@ include __DIR__ . '/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>vorta Prodtracker - Profil</title>
+    <title>Vorta Prodtracker - Profile</title>
     <link rel="stylesheet" href="css/output.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
 </head>
@@ -90,8 +90,8 @@ include __DIR__ . '/header.php';
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
             <!-- Header -->
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-center">
-                <h1 class="text-xl font-bold text-white mb-6">vorta Productivity Tracker</h1>
-                <img src="/images/kabahkopter.jpg" alt="Profile Picture" class="w-20 h-20 rounded-full border-4 border-white mx-auto mb-3">
+                <h1 class="text-xl font-bold text-white mb-6">Vorta Productivity Tracker</h1>
+                <img src="/images/defaultprofile.png" alt="Profile Picture" class="w-20 h-20 rounded-full border-4 border-white mx-auto mb-3">
                 <h2 class="text-2xl font-semibold text-white"><?php echo htmlspecialchars($name); ?></h2>
                 <p class="text-indigo-100 italic"><?php echo htmlspecialchars($position); ?></p>
                 <p class="text-white text-sm mt-1"><?php echo htmlspecialchars($email); ?></p>

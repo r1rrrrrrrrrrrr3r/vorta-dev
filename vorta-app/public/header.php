@@ -7,7 +7,7 @@ require_once __DIR__ . '/../lib/auth.php';
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>vorta Productivity Tracker</title>
+  <title>Vorta Productivity Tracker</title>
   <link rel="stylesheet" href="css/output.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
@@ -23,11 +23,10 @@ require_once __DIR__ . '/../lib/auth.php';
   <header class="bg-white shadow-sm sticky top-0 z-50">
     <div class="container mx-auto p-4">
       <div class="flex items-center justify-between h-16">
-        <div class="flex-shrink-0">
-          <img src="../images/vortalogo-removebg-preview.png" alt="Logo vorta" style="height: 40px; width: auto;"
-            class="mr-2">
+        <div class="flex-shrink-0 flex items-center">
+          <img src="../images/vorta.png" alt="Logo vorta" class="h-10 w-10 object-contain mr-2" style="height: 40px; width: 40px; max-height: 40px; display: inline-block;">
           <h1 class="text-xl font-bold text-indigo-700">
-            <span class="hidden sm:inline">vorta</span> Productivity Tracker
+            <span class="hidden sm:inline">Vorta</span> Productivity Tracker
           </h1>
         </div>
 

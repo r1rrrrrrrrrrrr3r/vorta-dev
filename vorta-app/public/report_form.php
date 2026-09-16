@@ -33,7 +33,7 @@ include __DIR__ . '/header.php';
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>vorta Prodtracker - Report Form</title>
+  <title>Vorta Prodtracker - Report Form</title>
   <link rel="stylesheet" href="css/output.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
