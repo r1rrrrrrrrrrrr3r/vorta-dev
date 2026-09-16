@@ -153,7 +153,7 @@ $totalPages = (int)ceil($totalEmployees / $perPage);
 
 // --- Fetch employees with user name
 $sql = "
-    SELECT e.employee_id, e.employee_code, e.user_id, e.name, e.position, e.phone, u.name as user_name 
+    SELECT e.employee_id, e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
     FROM employees e 
     JOIN users u ON u.user_id = e.user_id 
     $whereSql 
@@ -309,7 +309,7 @@ function page_url($p)
       <?php else: ?>
         <?php foreach ($employees as $e): ?>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3"><?= htmlspecialchars($e['employee_code'] ?? '-') ?></td>
+            <td class="px-4 py-3"><?= htmlspecialchars($e['employee_id'] ?? '-') ?></td>
             <td class="px-4 py-3"><?= htmlspecialchars($e['user_name']) ?></td>
             <td class="px-4 py-3"><?= htmlspecialchars($e['name']) ?></td>
             <td class="px-4 py-3"><?= htmlspecialchars($e['position'] ?? '-') ?></td>
