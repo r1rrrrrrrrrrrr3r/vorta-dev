@@ -24,9 +24,9 @@ require_once __DIR__ . '/../lib/auth.php';
     <div class="container mx-auto p-4">
       <div class="flex items-center justify-between h-16">
         <div class="flex-shrink-0 flex items-center">
-          <img src="../images/vorta.png" alt="Logo vorta" class="h-10 w-10 object-contain mr-2" style="height: 40px; width: 40px; max-height: 40px; display: inline-block;">
+          <img src="../images/vorta.png" alt="Logo vorta" class="h-10 w-10 object-contain mr-2" style="height: 55px; width: 55px; max-height: 55px; display: inline-block;">
           <h1 class="text-xl font-bold text-indigo-700">
-            <span class="hidden sm:inline">Vorta</span> Productivity Tracker
+            <span class="hidden sm:inline"></span> Productivity Tracker
           </h1>
         </div>
 
