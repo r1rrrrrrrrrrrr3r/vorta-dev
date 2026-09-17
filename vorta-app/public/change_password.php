@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <main class="flex justify-center items-center h-screen mx-1">
         <div class="w-auto sm:w-1/2 mx-auto bg-gray-50 rounded-lg shadow-lg p-6 mt-10">
-            <a href="profil.php"
+            <a href="profile.php"
                 class="text-black font-medium">
                 <i class="fas fa-arrow-left"></i>
             </a>

@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user']['name'] = $name;
             $_SESSION['user']['email'] = $email;
 
-            $success = "Profil berhasil diperbarui!";
+            $success = "Profile berhasil diperbarui!";
         }
     }
 }
@@ -80,7 +80,7 @@ include __DIR__ . '/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vorta Prodtracker - Edit Profil</title>
+    <title>Vorta Prodtracker - Edit Profile</title>
     <link rel="stylesheet" href="css/output.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -88,10 +88,10 @@ include __DIR__ . '/header.php';
 <body class="bg-gray-50">
     <div class="max-w-lg mx-auto bg-white rounded-lg shadow-lg p-6 mt-10">
         <div class="flex items-center gap-3 mb-6">
-            <a href="profil.php" class="text-black font-medium">
+            <a href="profile.php" class="text-black font-medium">
                 <i class="fas fa-arrow-left"></i>
             </a>
-            <h2 class="text-2xl font-bold text-gray-800">Edit Profil</h2>
+            <h2 class="text-2xl font-bold text-gray-800">Edit Profile</h2>
         </div>
 
         <?php if ($error): ?>
@@ -137,7 +137,7 @@ include __DIR__ . '/header.php';
                         class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
                     Save Change
                 </button>
-                <a href="profil.php"
+                <a href="profile.php"
                    class="px-6 py-2 bg-gray-400 text-white font-medium rounded-lg hover:bg-gray-500 transition">
                     Cancel
                 </a>

@@ -67,8 +67,8 @@ require_once __DIR__ . '/../lib/auth.php';
                 class="px-3 py-2 text-sm font-medium rounded-md transition-all <?= basename($_SERVER['PHP_SELF']) === 'reports_my.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">
                 My Report
               </a>
-              <a href="profil.php"
-                class="px-3 py-2 text-sm font-medium rounded-md transition-all <?= basename($_SERVER['PHP_SELF']) === 'profil.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">
+              <a href="profile.php"
+                class="px-3 py-2 text-sm font-medium rounded-md transition-all <?= basename($_SERVER['PHP_SELF']) === 'profile.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">
                 My Profile
               </a>
             <?php endif; ?>
@@ -103,7 +103,7 @@ require_once __DIR__ . '/../lib/auth.php';
               <a href="attendance.php" class="px-3 py-2 rounded-md text-sm font-medium <?= basename($_SERVER['PHP_SELF']) === 'attendance.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">Absen</a>
               <a href="report_form.php" class="px-3 py-2 rounded-md text-sm font-medium <?= basename($_SERVER['PHP_SELF']) === 'report_form.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">Input Laporan</a>
               <a href="reports_my.php" class="px-3 py-2 rounded-md text-sm font-medium <?= basename($_SERVER['PHP_SELF']) === 'reports_my.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">Laporan Saya</a>
-              <a href="profil.php" class="px-3 py-2 rounded-md text-sm font-medium <?= basename($_SERVER['PHP_SELF']) === 'profil.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">My Profile</a>
+              <a href="profile.php" class="px-3 py-2 rounded-md text-sm font-medium <?= basename($_SERVER['PHP_SELF']) === 'profile.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">My Profile</a>
             <?php endif; ?>
 
             <a href="logout.php" class="px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:text-red-700 hover:bg-gray-100">Logout</a>
