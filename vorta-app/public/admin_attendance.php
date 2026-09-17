@@ -3,19 +3,18 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_admin();
 
-$recapType = $_GET['recap_type'] ?? 'daily'; // default daily
+$recapType = $_GET['recap_type'] ?? 'daily';
 $date = $_GET['date'] ?? date('Y-m-d');
 $month = $_GET['month'] ?? date('Y-m');
 
-// Validasi notes sesuai format database: "Hadir: WFH", "Late: WFO", dll.
 $validNotes = [
   '',
-  'Hadir: Morning',
-  'Hadir: Afternoon',
-  'Hadir: WFH',
-  'Hadir: WFO',
-  'Hadir: WAC',
-  'Hadir: WFA',
+  'Present: Morning',
+  'Present: Afternoon',
+  'Present: WFH',
+  'Present: WFO',
+  'Present: WAC',
+  'Present: WFA',
   'Late: Morning',
   'Late: Afternoon',
   'Late: WFH',
@@ -30,10 +29,8 @@ $validNotes = [
 ];
 $notesFilter = in_array($_GET['notes'] ?? '', $validNotes) ? ($_GET['notes'] ?? '') : '';
 
-// Filter user untuk monthly
 $userFilter = $_GET['user_id'] ?? '';
 
-// Fungsi bantu URL pagination daily
 function buildDailyUrl($page, $date, $notes)
 {
   return '?' . http_build_query([
@@ -44,12 +41,10 @@ function buildDailyUrl($page, $date, $notes)
   ]);
 }
 
-// === DAILY LOGIC ===
 $limitDaily = 10;
 $dailyPage = isset($_GET['daily_page']) ? max(1, (int)$_GET['daily_page']) : 1;
 $dailyOffset = ($dailyPage - 1) * $limitDaily;
 
-// Hitung total daily
 $sqlCountDaily = "SELECT COUNT(*) FROM attendance a WHERE a.date = ?";
 $paramsDaily = [$date];
 if (!empty($notesFilter)) {
@@ -61,16 +56,14 @@ $countDaily->execute($paramsDaily);
 $totalDaily = (int)$countDaily->fetchColumn();
 $totalDailyPages = ceil($totalDaily / $limitDaily);
 
-// Hitung startPage dan endPage untuk daily pagination
 $dailyStartPage = max(1, $dailyPage - 2);
 $dailyEndPage = min($totalDailyPages, $dailyStartPage + 4);
 if ($dailyEndPage - $dailyStartPage < 4) {
   $dailyStartPage = max(1, $dailyEndPage - 4);
 }
 
-// Ambil data daily
 $sqlDaily = "
-    SELECT a.*, u.name, u.email 
+    SELECT a.*, u.name, u.email
     FROM attendance a
     JOIN users u ON a.user_id = u.user_id
     WHERE a.date = ?
@@ -87,7 +80,6 @@ $stmt = $pdo->prepare($sqlDaily);
 $stmt->execute($paramsDaily);
 $daily = $stmt->fetchAll();
 
-// === MONTHLY LOGIC ===
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
 
@@ -95,11 +87,9 @@ $limitMonthly = 10;
 $monthlyPage = isset($_GET['monthly_page']) ? max(1, (int)$_GET['monthly_page']) : 1;
 $monthlyOffset = ($monthlyPage - 1) * $limitMonthly;
 
-// Query untuk mendapatkan daftar user untuk filter dropdown
 $usersStmt = $pdo->query("SELECT user_id, name FROM users WHERE is_active = 1 ORDER BY name");
 $users = $usersStmt->fetchAll();
 
-// Hitung total monthly dengan filter
 $sqlCountMonthly = "SELECT COUNT(*) FROM users WHERE is_active = 1";
 $paramsMonthly = [];
 if (!empty($userFilter)) {
@@ -112,34 +102,32 @@ $countMonthly->execute($paramsMonthly);
 $totalMonthly = (int)$countMonthly->fetchColumn();
 $totalMonthlyPages = ceil($totalMonthly / $limitMonthly);
 
-// Hitung startPage dan endPage untuk monthly pagination
 $monthlyStartPage = max(1, $monthlyPage - 2);
 $monthlyEndPage = min($totalMonthlyPages, $monthlyStartPage + 4);
 if ($monthlyEndPage - $monthlyStartPage < 4) {
   $monthlyStartPage = max(1, $monthlyEndPage - 4);
 }
 
-// Query untuk data monthly dengan filter user
 $sqlMonthly = "
-    SELECT u.user_id, u.name, 
-           SUM(CASE 
-               WHEN a.status = 'Hadir' AND a.notes LIKE 'Hadir:%' AND TIME(a.check_in) <= '07:45:00' THEN 1 
-               ELSE 0 
-           END) as hadir_shift_pagi,
-           SUM(CASE 
-               WHEN a.status = 'Hadir' AND a.notes LIKE 'Hadir:%' AND TIME(a.check_in) > '07:45:00' AND TIME(a.check_in) <= '13:10:00' THEN 1 
-               ELSE 0 
-           END) as hadir_shift_siang,
-           SUM(CASE 
-               WHEN a.status = 'Hadir' AND a.notes LIKE 'Hadir:%' AND TIME(a.check_in) > '13:10:00' THEN 1 
-               ELSE 0 
-           END) as hadir_invalid,
-           SUM(CASE 
-               WHEN a.notes LIKE 'Late:%' THEN 1 
-               ELSE 0 
-           END) as telat,
-           SUM(CASE WHEN a.status = 'Izin' THEN 1 ELSE 0 END) as izin,
-           SUM(CASE WHEN a.status = 'Sakit' THEN 1 ELSE 0 END) as sakit,
+    SELECT u.user_id, u.name,
+           SUM(CASE
+               WHEN a.status = 'Present' AND a.notes LIKE 'Present:%' AND TIME(a.check_in) <= '07:45:00' THEN 1
+               ELSE 0
+           END) as present_shift_morning,
+           SUM(CASE
+               WHEN a.status = 'Present' AND a.notes LIKE 'Present:%' AND TIME(a.check_in) > '07:45:00' AND TIME(a.check_in) <= '13:10:00' THEN 1
+               ELSE 0
+           END) as present_shift_afternoon,
+           SUM(CASE
+               WHEN a.status = 'Present' AND a.notes LIKE 'Present:%' AND TIME(a.check_in) > '13:10:00' THEN 1
+               ELSE 0
+           END) as present_invalid,
+           SUM(CASE
+               WHEN a.notes LIKE 'Late:%' THEN 1
+               ELSE 0
+           END) as late,
+           SUM(CASE WHEN a.status = 'Leave' THEN 1 ELSE 0 END) as leave_count,
+           SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as sick,
            COUNT(a.attendance_id) as total_records
     FROM users u
     LEFT JOIN attendance a ON a.user_id = u.user_id AND a.date BETWEEN ? AND ?
@@ -161,24 +149,23 @@ $stmt = $pdo->prepare($sqlMonthly);
 $stmt->execute($paramsMonthlyQuery);
 $monthly = $stmt->fetchAll();
 
-// Hitung total untuk semua user (untuk summary)
 $sqlTotalMonthly = "
-    SELECT 
-           SUM(CASE 
-               WHEN a.status = 'Hadir' AND a.notes LIKE 'Hadir:%' AND TIME(a.check_in) <= '07:45:00' THEN 1 
-               ELSE 0 
-           END) as total_hadir_pagi,
-           SUM(CASE 
-               WHEN a.status = 'Hadir' AND a.notes LIKE 'Hadir:%' AND TIME(a.check_in) > '07:45:00' AND TIME(a.check_in) <= '13:10:00' THEN 1 
-               ELSE 0 
-           END) as total_hadir_siang,
-           SUM(CASE 
-               WHEN a.notes LIKE 'Late:%' THEN 1 
-               ELSE 0 
-           END) as total_telat,
-           SUM(CASE WHEN a.status = 'Izin' THEN 1 ELSE 0 END) as total_izin,
-           SUM(CASE WHEN a.status = 'Sakit' THEN 1 ELSE 0 END) as total_sakit
-    FROM attendance a 
+    SELECT
+           SUM(CASE
+               WHEN a.status = 'Present' AND a.notes LIKE 'Present:%' AND TIME(a.check_in) <= '07:45:00' THEN 1
+               ELSE 0
+           END) as total_present_morning,
+           SUM(CASE
+               WHEN a.status = 'Present' AND a.notes LIKE 'Present:%' AND TIME(a.check_in) > '07:45:00' AND TIME(a.check_in) <= '13:10:00' THEN 1
+               ELSE 0
+           END) as total_present_afternoon,
+           SUM(CASE
+               WHEN a.notes LIKE 'Late:%' THEN 1
+               ELSE 0
+           END) as total_late,
+           SUM(CASE WHEN a.status = 'Leave' THEN 1 ELSE 0 END) as total_leave,
+           SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as total_sick
+    FROM attendance a
     WHERE a.date BETWEEN ? AND ?
 ";
 
@@ -194,20 +181,18 @@ include __DIR__ . '/header.php';
 
 <head>
   <meta charset="UTF-8">
-  <title>Vorta Prodtracker - Attendance Recap</title>
+  <title>vorta Prodtracker - Attendance Recap</title>
   <link rel="stylesheet" href="css/output.css">
 </head>
 
 <body>
   <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
 
-    <!-- Recap Switcher Card -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6 md:p-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 class="text-2xl font-bold text-gray-800">Attendance Recap</h1>
 
-          <!-- Filter Form -->
           <form class="flex flex-col sm:flex-row items-center gap-2" method="get">
             <input type="hidden" name="recap_type" value="<?= $recapType ?>">
 
@@ -219,22 +204,20 @@ include __DIR__ . '/header.php';
             </select>
 
             <?php if ($recapType === 'daily'): ?>
-              <!-- Daily filter: Date -->
               <input type="date" name="date"
                 value="<?= htmlspecialchars($date) ?>"
                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
 
-              <!-- Daily filter: Notes -->
               <select name="notes"
                 onchange="this.form.submit()"
                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
                 <option value="">-- All Notes --</option>
-                <option value="Hadir: Morning" <?= $notesFilter === 'Hadir: Morning' ? 'selected' : '' ?>>Hadir: Morning</option>
-                <option value="Hadir: Afternoon" <?= $notesFilter === 'Hadir: Afternoon' ? 'selected' : '' ?>>Hadir: Afternoon</option>
-                <option value="Hadir: WFH" <?= $notesFilter === 'Hadir: WFH' ? 'selected' : '' ?>>Hadir: WFH</option>
-                <option value="Hadir: WFO" <?= $notesFilter === 'Hadir: WFO' ? 'selected' : '' ?>>Hadir: WFO</option>
-                <option value="Hadir: WAC" <?= $notesFilter === 'Hadir: WAC' ? 'selected' : '' ?>>Hadir: WAC</option>
-                <option value="Hadir: WFA" <?= $notesFilter === 'Hadir: WFA' ? 'selected' : '' ?>>Hadir: WFA</option>
+                <option value="Present: Morning" <?= $notesFilter === 'Present: Morning' ? 'selected' : '' ?>>Present: Morning</option>
+                <option value="Present: Afternoon" <?= $notesFilter === 'Present: Afternoon' ? 'selected' : '' ?>>Present: Afternoon</option>
+                <option value="Present: WFH" <?= $notesFilter === 'Present: WFH' ? 'selected' : '' ?>>Present: WFH</option>
+                <option value="Present: WFO" <?= $notesFilter === 'Present: WFO' ? 'selected' : '' ?>>Present: WFO</option>
+                <option value="Present: WAC" <?= $notesFilter === 'Present: WAC' ? 'selected' : '' ?>>Present: WAC</option>
+                <option value="Present: WFA" <?= $notesFilter === 'Present: WFA' ? 'selected' : '' ?>>Present: WFA</option>
                 <option value="Late: Morning" <?= $notesFilter === 'Late: Morning' ? 'selected' : '' ?>>Late: Morning</option>
                 <option value="Late: Afternoon" <?= $notesFilter === 'Late: Afternoon' ? 'selected' : '' ?>>Late: Afternoon</option>
                 <option value="Late: WFH" <?= $notesFilter === 'Late: WFH' ? 'selected' : '' ?>>Late: WFH</option>
@@ -248,12 +231,10 @@ include __DIR__ . '/header.php';
                 <option value="Absence Reason: Others" <?= $notesFilter === 'Absence Reason: Others' ? 'selected' : '' ?>>Absence Reason: Others</option>
               </select>
             <?php else: ?>
-              <!-- Monthly filter: Month -->
               <input type="month" name="month"
                 value="<?= htmlspecialchars($month) ?>"
                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-              
-              <!-- Monthly filter: User -->
+
               <select name="user_id"
                 onchange="this.form.submit()"
                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
@@ -277,30 +258,29 @@ include __DIR__ . '/header.php';
           </form>
         </div>
 
-        <!-- Monthly Summary Card -->
         <?php if ($recapType === 'monthly' && empty($userFilter)): ?>
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 class="text-lg font-semibold text-blue-800 mb-3">Monthly Summary - <?= date('F Y', strtotime($start)) ?></h3>
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div class="text-center">
-                <div class="text-2xl font-bold text-green-700"><?= $monthlyTotals['total_hadir_pagi'] ?? 0 ?></div>
-                <div class="text-sm text-gray-600">Hadir Pagi</div>
+                <div class="text-2xl font-bold text-green-700"><?= $monthlyTotals['total_present_morning'] ?? 0 ?></div>
+                <div class="text-sm text-gray-600">Present Morning</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-green-600"><?= $monthlyTotals['total_hadir_siang'] ?? 0 ?></div>
-                <div class="text-sm text-gray-600">Hadir Siang</div>
+                <div class="text-2xl font-bold text-green-600"><?= $monthlyTotals['total_present_afternoon'] ?? 0 ?></div>
+                <div class="text-sm text-gray-600">Present Afternoon</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-yellow-600"><?= $monthlyTotals['total_telat'] ?? 0 ?></div>
-                <div class="text-sm text-gray-600">Telat</div>
+                <div class="text-2xl font-bold text-yellow-600"><?= $monthlyTotals['total_late'] ?? 0 ?></div>
+                <div class="text-sm text-gray-600">Late</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-indigo-600"><?= $monthlyTotals['total_izin'] ?? 0 ?></div>
-                <div class="text-sm text-gray-600">Izin</div>
+                <div class="text-2xl font-bold text-indigo-600"><?= $monthlyTotals['total_leave'] ?? 0 ?></div>
+                <div class="text-sm text-gray-600">Leave</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-purple-600"><?= $monthlyTotals['total_sakit'] ?? 0 ?></div>
-                <div class="text-sm text-gray-600">Sakit</div>
+                <div class="text-2xl font-bold text-purple-600"><?= $monthlyTotals['total_sick'] ?? 0 ?></div>
+                <div class="text-sm text-gray-600">Sick</div>
               </div>
             </div>
           </div>
@@ -309,7 +289,6 @@ include __DIR__ . '/header.php';
         <div class="overflow-x-auto">
           <table class="w-full">
             <?php if ($recapType === 'daily'): ?>
-              <!-- Daily Table -->
               <thead>
                 <tr class="text-left border-b border-gray-200">
                   <th class="pb-3 font-medium text-gray-600">Name</th>
@@ -347,36 +326,35 @@ include __DIR__ . '/header.php';
               </tbody>
 
             <?php else: ?>
-              <!-- Monthly Table -->
               <thead>
                 <tr class="text-left border-b border-gray-200">
                   <th class="pb-3 font-medium text-gray-600">Name</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Hadir Pagi</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Hadir Siang</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Hadir Invalid</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Telat</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Izin</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Sakit</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Total Hadir</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Total Absen</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Present Morning</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Present Afternoon</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Present Invalid</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Late</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Leave</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Sick</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Total Present</th>
+                  <th class="pb-3 font-medium text-gray-600 text-center">Total Absent</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <?php if (count($monthly) > 0): ?>
                   <?php foreach ($monthly as $record):
-                    $totalHadir = ($record['hadir_shift_pagi'] ?? 0) + ($record['hadir_shift_siang'] ?? 0);
-                    $totalAbsen = ($record['telat'] ?? 0) + ($record['izin'] ?? 0) + ($record['sakit'] ?? 0);
+                    $totalPresent = ($record['present_shift_morning'] ?? 0) + ($record['present_shift_afternoon'] ?? 0);
+                    $totalAbsent = ($record['late'] ?? 0) + ($record['leave_count'] ?? 0) + ($record['sick'] ?? 0);
                   ?>
                     <tr class="hover:bg-gray-50 transition">
                       <td class="py-4 text-sm font-medium text-gray-800"><?= htmlspecialchars($record['name']) ?></td>
-                      <td class="py-4 text-sm text-center text-green-700"><?= $record['hadir_shift_pagi'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center text-green-600"><?= $record['hadir_shift_siang'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center text-red-600"><?= $record['hadir_invalid'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center text-yellow-600"><?= $record['telat'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center text-indigo-600"><?= $record['izin'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center text-purple-600"><?= $record['sakit'] ?? 0 ?></td>
-                      <td class="py-4 text-sm text-center font-bold text-green-800"><?= $totalHadir ?></td>
-                      <td class="py-4 text-sm text-center font-bold text-red-600"><?= $totalAbsen ?></td>
+                      <td class="py-4 text-sm text-center text-green-700"><?= $record['present_shift_morning'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center text-green-600"><?= $record['present_shift_afternoon'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center text-red-600"><?= $record['present_invalid'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center text-yellow-600"><?= $record['late'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center text-indigo-600"><?= $record['leave_count'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center text-purple-600"><?= $record['sick'] ?? 0 ?></td>
+                      <td class="py-4 text-sm text-center font-bold text-green-800"><?= $totalPresent ?></td>
+                      <td class="py-4 text-sm text-center font-bold text-red-600"><?= $totalAbsent ?></td>
                     </tr>
                   <?php endforeach; ?>
                 <?php else: ?>
@@ -389,14 +367,12 @@ include __DIR__ . '/header.php';
           </table>
         </div>
 
-        <!-- Pagination Daily -->
         <?php if ($recapType === 'daily' && $totalDailyPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Page <?= $dailyPage ?> of <?= $totalDailyPages ?>
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page Button -->
               <?php if ($dailyPage > 1): ?>
                 <a href="?recap_type=daily&date=<?= htmlspecialchars($date) ?>&notes=<?= htmlspecialchars($notesFilter) ?>&daily_page=1"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -410,7 +386,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Previous Button -->
               <?php if ($dailyPage > 1): ?>
                 <a href="?recap_type=daily&date=<?= htmlspecialchars($date) ?>&notes=<?= htmlspecialchars($notesFilter) ?>&daily_page=<?= $dailyPage - 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -424,7 +399,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Page Numbers -->
               <div class="hidden xs:flex gap-1">
                 <?php for ($i = $dailyStartPage; $i <= $dailyEndPage; $i++): ?>
                   <a href="?recap_type=daily&date=<?= htmlspecialchars($date) ?>&notes=<?= htmlspecialchars($notesFilter) ?>&daily_page=<?= $i ?>"
@@ -434,12 +408,10 @@ include __DIR__ . '/header.php';
                 <?php endfor; ?>
               </div>
 
-              <!-- Page indicator for mobile -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $dailyPage ?>
               </div>
 
-              <!-- Next Button -->
               <?php if ($dailyPage < $totalDailyPages): ?>
                 <a href="?recap_type=daily&date=<?= htmlspecialchars($date) ?>&notes=<?= htmlspecialchars($notesFilter) ?>&daily_page=<?= $dailyPage + 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -453,7 +425,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Last Page Button -->
               <?php if ($dailyPage < $totalDailyPages): ?>
                 <a href="?recap_type=daily&date=<?= htmlspecialchars($date) ?>&notes=<?= htmlspecialchars($notesFilter) ?>&daily_page=<?= $totalDailyPages ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -470,14 +441,12 @@ include __DIR__ . '/header.php';
           </div>
         <?php endif; ?>
 
-        <!-- Pagination Monthly -->
         <?php if ($recapType === 'monthly' && $totalMonthlyPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Page <?= $monthlyPage ?> of <?= $totalMonthlyPages ?>
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page Button -->
               <?php if ($monthlyPage > 1): ?>
                 <a href="?recap_type=monthly&month=<?= htmlspecialchars($month) ?>&user_id=<?= htmlspecialchars($userFilter) ?>&monthly_page=1"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -491,7 +460,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Previous Button -->
               <?php if ($monthlyPage > 1): ?>
                 <a href="?recap_type=monthly&month=<?= htmlspecialchars($month) ?>&user_id=<?= htmlspecialchars($userFilter) ?>&monthly_page=<?= $monthlyPage - 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -505,7 +473,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Page Numbers -->
               <div class="hidden xs:flex gap-1">
                 <?php for ($i = $monthlyStartPage; $i <= $monthlyEndPage; $i++): ?>
                   <a href="?recap_type=monthly&month=<?= htmlspecialchars($month) ?>&user_id=<?= htmlspecialchars($userFilter) ?>&monthly_page=<?= $i ?>"
@@ -515,12 +482,10 @@ include __DIR__ . '/header.php';
                 <?php endfor; ?>
               </div>
 
-              <!-- Page indicator for mobile -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $monthlyPage ?>
               </div>
 
-              <!-- Next Button -->
               <?php if ($monthlyPage < $totalMonthlyPages): ?>
                 <a href="?recap_type=monthly&month=<?= htmlspecialchars($month) ?>&user_id=<?= htmlspecialchars($userFilter) ?>&monthly_page=<?= $monthlyPage + 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -534,7 +499,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Last Page Button -->
               <?php if ($monthlyPage < $totalMonthlyPages): ?>
                 <a href="?recap_type=monthly&month=<?= htmlspecialchars($month) ?>&user_id=<?= htmlspecialchars($userFilter) ?>&monthly_page=<?= $totalMonthlyPages ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">

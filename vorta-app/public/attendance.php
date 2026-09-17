@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/csrf.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -10,7 +11,6 @@ $limit = 7;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-// Get employee position
 $stmt = $pdo->prepare("SELECT position FROM employees WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $employee = $stmt->fetch();
@@ -18,52 +18,45 @@ $employee = $stmt->fetch();
 $isIntern = false;
 if ($employee) {
     $position = strtolower(trim($employee['position']));
-    $isIntern = in_array($position, ['internship', 'intern', 'magang']);
+    $isIntern = in_array($position, ['internship', 'intern']);
 }
 
-// Handle Absence Reason Submission (REVISI: Hanya untuk hari ini)
 if (isset($_POST['submitAbsenceReason'])) {
-    $absence_date = $today; // SELALU hari ini, tidak bisa pilih kemarin
+    csrf_verify();
+    $absence_date = $today;
     $absence_type = $_POST['absence_type'] ?? '';
     $explanation = trim($_POST['explanation'] ?? '');
 
-    // Validasi input
     if (empty($absence_type) || empty($explanation)) {
         header("Location: attendance.php?error=missing_data");
         exit;
     }
 
-    // Validasi: Hanya boleh input untuk hari ini
     if ($absence_date !== $today) {
         header("Location: attendance.php?error=invalid_date");
         exit;
     }
 
-    // Validasi: Batas waktu hari ini sampai 23:59
     if ($current_time >= '23:59:59') {
         header("Location: attendance.php?error=time_expired");
         exit;
     }
 
-    // Cek apakah sudah ada attendance record untuk hari ini
     $stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
     $stmt->execute([$user_id, $absence_date]);
     $existing = $stmt->fetch();
 
     if ($existing) {
-        // Jika sudah ada record, hanya bisa update jika statusnya masih kosong/null
         if ($existing['status'] !== null && $existing['status'] !== '') {
             header("Location: attendance.php?error=already_attended");
             exit;
         }
 
-        // Update existing record
-        $stmt = $pdo->prepare("UPDATE attendance SET status = ?, notes = ?, explanation = ?, updated_at = NOW() 
+        $stmt = $pdo->prepare("UPDATE attendance SET status = ?, notes = ?, explanation = ?, updated_at = NOW()
                               WHERE user_id = ? AND date = ?");
         $stmt->execute([$absence_type, "Absence Reason: $absence_type", $explanation, $user_id, $absence_date]);
     } else {
-        // Insert new record
-        $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation, created_at) 
+        $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation, created_at)
                               VALUES (?, ?, ?, ?, ?, NOW())");
         $stmt->execute([$user_id, $absence_date, $absence_type, "Absence Reason: $absence_type", $explanation]);
     }
@@ -72,8 +65,8 @@ if (isset($_POST['submitAbsenceReason'])) {
     exit;
 }
 
-// Handle Leave Request
 if (isset($_POST['submitLeave'])) {
+    csrf_verify();
     $leave_type = $_POST['leave_type'] ?? '';
     $explanation = trim($_POST['explanation']);
 
@@ -82,7 +75,6 @@ if (isset($_POST['submitLeave'])) {
         exit;
     }
 
-    // Cek apakah sudah check-in
     $stmt = $pdo->prepare("SELECT check_in FROM attendance WHERE user_id = ? AND date = ?");
     $stmt->execute([$user_id, $today]);
     $existing = $stmt->fetch();
@@ -92,7 +84,6 @@ if (isset($_POST['submitLeave'])) {
         exit;
     }
 
-    // Tentukan status
     $status = match ($leave_type) {
         'Sick' => 'Sick',
         'Leave' => 'Leave',
@@ -102,12 +93,11 @@ if (isset($_POST['submitLeave'])) {
 
     $notes = "$status request";
 
-    // Simpan ke database
-    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation) 
+    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation)
                           VALUES (?, ?, ?, ?, ?)
-                          ON DUPLICATE KEY UPDATE 
-                          status = VALUES(status), 
-                          notes = VALUES(notes), 
+                          ON DUPLICATE KEY UPDATE
+                          status = VALUES(status),
+                          notes = VALUES(notes),
                           explanation = VALUES(explanation)");
 
     $stmt->execute([$user_id, $today, $status, $notes, $explanation]);
@@ -116,14 +106,13 @@ if (isset($_POST['submitLeave'])) {
     exit;
 }
 
-// Handle Check-in
 if (isset($_POST['submitCheckIn'])) {
+    csrf_verify();
     $current_time = date('H:i:s');
     $location = trim($_POST['location']);
     $shift = $_POST['shift'] ?? 'WFO';
     $explanation = trim($_POST['explanation'] ?? '');
 
-    // Cek apakah sudah request leave atau absence reason
     $stmt = $pdo->prepare("SELECT status FROM attendance WHERE user_id = ? AND date = ?");
     $stmt->execute([$user_id, $today]);
     $existing = $stmt->fetch();
@@ -134,10 +123,9 @@ if (isset($_POST['submitCheckIn'])) {
     }
 
     $status = 'Present';
-    $notes = "Hadir: $shift";
+    $notes = "Present: $shift";
     $save_explanation = null;
 
-    // Cek keterlambatan
     $is_late = false;
     $current_minutes = (int)date('H') * 60 + (int)date('i');
 
@@ -160,12 +148,11 @@ if (isset($_POST['submitCheckIn'])) {
         $save_explanation = $explanation;
     }
 
-    // Simpan ke database
-    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, check_in, status, location, notes, explanation) 
+    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, check_in, status, location, notes, explanation)
                           VALUES (?, ?, ?, ?, ?, ?, ?)
-                          ON DUPLICATE KEY UPDATE 
-                          check_in = VALUES(check_in), 
-                          status = VALUES(status), 
+                          ON DUPLICATE KEY UPDATE
+                          check_in = VALUES(check_in),
+                          status = VALUES(status),
                           location = VALUES(location),
                           notes = VALUES(notes),
                           explanation = VALUES(explanation)");
@@ -184,8 +171,8 @@ if (isset($_POST['submitCheckIn'])) {
     exit;
 }
 
-// Handle Check-out
 if (isset($_POST['check_out'])) {
+    csrf_verify();
     $current_time = date('H:i:s');
     $stmt = $pdo->prepare("UPDATE attendance SET check_out = ? WHERE user_id = ? AND date = ?");
     $stmt->execute([$current_time, $user_id, $today]);
@@ -193,33 +180,27 @@ if (isset($_POST['check_out'])) {
     exit;
 }
 
-// Get today's attendance
 $stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
 $stmt->execute([$user_id, $today]);
 $attendance = $stmt->fetch();
 
-// Cek apakah sudah request leave atau absence
 $is_leave = $attendance && in_array($attendance['status'], ['Leave', 'Sick', 'Others', 'Absent', 'Forgot']);
 
-// REVISI: Hanya bisa input absence reason untuk hari ini saja, sampai jam 23:59
 $can_input_absence = ($current_time < '23:59:59') &&
     (!$attendance || empty($attendance['status']) ||
         in_array($attendance['status'], ['', null]));
 
-// Get monthly attendance dengan pagination
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
 
-// Hitung total data untuk pagination
 $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM attendance WHERE user_id = ? AND date BETWEEN ? AND ?");
 $totalStmt->execute([$user_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $limit));
 
-// Get data dengan pagination
 $sql = "SELECT date, check_in, check_out, status, location, notes, explanation
-        FROM attendance 
+        FROM attendance
         WHERE user_id = ? AND date BETWEEN ? AND ?
         ORDER BY date DESC
         LIMIT $limit OFFSET $offset";
@@ -227,8 +208,6 @@ $sql = "SELECT date, check_in, check_out, status, location, notes, explanation
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$user_id, $start, $end]);
 $monthly = $stmt->fetchAll();
-
-
 
 include __DIR__ . '/header.php';
 ?>
@@ -239,32 +218,28 @@ include __DIR__ . '/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vorta Prodtracker - Attendance</title>
+    <title>vorta Productivity Tracker - Attendance</title>
     <link rel="stylesheet" href="css/output.css">
 </head>
 
 <body>
     <div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
-        <!-- Today's Attendance -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="p-6 md:p-8">
-                <!-- Header Section -->
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">Attendance Today (<?= date('d F Y') ?>)</h1>
                         <p class="text-sm text-gray-600 mt-1">
-                            Batas input absence reason: Hari ini sampai jam <strong>23:59</strong>
+                            Absence reason submission deadline: Today until <strong>23:59</strong>
                         </p>
                     </div>
 
                     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                        <!-- Employee Status Badge -->
                         <span class="inline-block px-4 py-2 bg-gray-100 text-gray-800 text-sm font-medium rounded-full whitespace-nowrap">
                             You are: <strong><?= $isIntern ? 'Internship' : 'Full-time Employee' ?></strong>
                         </span>
 
-                        <!-- Input Absence Reason Button -->
                         <?php if ($can_input_absence): ?>
                             <button type="button" id="btnAbsenceReason"
                                 class="px-4 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap hover:opacity-85 hover:cursor-pointer"
@@ -276,41 +251,37 @@ include __DIR__ . '/header.php';
                     </div>
                 </div>
 
-                <!-- Success Messages -->
                 <?php if (isset($_GET['success'])): ?>
                     <div class="mb-6 p-4 bg-green-50 text-green-700 rounded-lg text-sm">
                         <?= htmlspecialchars(
-                            $_GET['success'] === 'absence_reason_submitted' ? 'Alasan ketidakhadiran berhasil disimpan.' :
-                                'Aksi berhasil dilakukan.'
+                            $_GET['success'] === 'absence_reason_submitted' ? 'Absence reason submitted successfully.' :
+                                'Action completed successfully.'
                         ) ?>
                     </div>
                 <?php endif; ?>
 
-                <!-- Error Messages -->
                 <?php if (isset($_GET['error'])): ?>
                     <div class="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">
                         <?= htmlspecialchars(
-                            $_GET['error'] === 'missing_data' ? 'Data tidak lengkap.' : ($_GET['error'] === 'already_checked_in' ? 'Anda sudah check-in, tidak bisa request leave.' : ($_GET['error'] === 'leave_already_submitted' ? 'Anda sudah request leave, tidak bisa check-in.' : ($_GET['error'] === 'attendance_already_submitted' ? 'Anda sudah mengisi kehadiran untuk hari ini.' : ($_GET['error'] === 'explanation_required' ? 'Alasan keterlambatan wajib diisi (min. 10 karakter).' : ($_GET['error'] === 'invalid_date' ? 'Hanya bisa input absence reason untuk hari ini.' : ($_GET['error'] === 'time_expired' ? 'Batas waktu input absence reason sudah lewat (23:59).' : ($_GET['error'] === 'already_attended' ? 'Anda sudah mengisi kehadiran untuk tanggal tersebut.' :
-                                'Error tidak diketahui.')))))))
+                            $_GET['error'] === 'missing_data' ? 'Incomplete data.' : ($_GET['error'] === 'already_checked_in' ? 'You have already checked in, cannot request leave.' : ($_GET['error'] === 'leave_already_submitted' ? 'You have already requested leave, cannot check in.' : ($_GET['error'] === 'attendance_already_submitted' ? 'You have already submitted attendance for today.' : ($_GET['error'] === 'explanation_required' ? 'A reason for lateness is required (min. 10 characters).' : ($_GET['error'] === 'invalid_date' ? 'You can only submit an absence reason for today.' : ($_GET['error'] === 'time_expired' ? 'The absence reason submission deadline has passed (23:59).' : ($_GET['error'] === 'already_attended' ? 'You have already submitted attendance for that date.' :
+                                'Unknown error.')))))))
                         ) ?>
                     </div>
                 <?php endif; ?>
 
-                <!-- Main Action Buttons -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <!-- Check-in -->
                     <button type="button" id="btnCheckIn"
                         <?= ($attendance && $attendance['check_in']) || $is_leave ? 'disabled' : '' ?>
-                        class="w-full py-3 px-4 
+                        class="w-full py-3 px-4
                         <?= ($attendance && $attendance['check_in']) || $is_leave ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700' ?>
                         text-white font-medium rounded-lg transition">
                         <?= $attendance && $attendance['check_in'] ? 'Checked-in (' . $attendance['check_in'] . ')' : ($is_leave ? 'Attendance Submitted' : 'Check-in') ?>
                     </button>
 
-                    <!-- Checkout Button -->
                     <form method="post" id="checkoutForm" class="flex-1">
+                        <?= csrf_field() ?>
                         <button type="button" id="btnCheckout"
-                            class="w-full py-3 px-4 
+                            class="w-full py-3 px-4
                             <?= !$attendance || !$attendance['check_in'] || $attendance['check_out'] ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700' ?>
                             text-white font-medium rounded-lg transition"
                             <?= !$attendance || !$attendance['check_in'] || $attendance['check_out'] ? 'disabled' : '' ?>>
@@ -319,22 +290,20 @@ include __DIR__ . '/header.php';
                         <input type="hidden" name="check_out" value="1">
                     </form>
 
-                    <!-- Leave -->
                     <button id="btnLeave" type="button"
                         <?= ($attendance && $attendance['check_in']) || $is_leave ? 'disabled' : '' ?>
-                        class="w-full py-3 px-4 
+                        class="w-full py-3 px-4
                         <?= ($attendance && $attendance['check_in']) || $is_leave ? 'bg-gray-300 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600' ?>
                         text-white font-medium rounded-lg transition">
                         <?= ($attendance && $attendance['check_in']) || $is_leave ? 'Already Action Taken' : 'Request Leave' ?>
                     </button>
                 </div>
 
-                <!-- Today's Details -->
                 <?php if ($attendance): ?>
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <p class="text-sm text-gray-500">Status</p>
-                            <p class="font-medium 
+                            <p class="font-medium
                                 <?= $attendance['status'] === 'Present' ? 'text-green-600' : ($attendance['status'] === 'Late' ? 'text-yellow-600' :
                                     'text-red-600') ?>">
                                 <?= htmlspecialchars($attendance['status']) ?>
@@ -364,44 +333,44 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Modal Absence Reason (REVISI: Hanya untuk hari ini) -->
         <div id="modalAbsenceReason" class="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
                 <h2 class="text-lg font-bold mb-4">Input Absence Reason</h2>
                 <p class="text-sm text-gray-600 mb-4">
-                    <strong>Batas waktu:</strong> Hari ini sampai jam <strong>23:59</strong><br>
-                    <strong>Tanggal:</strong> <?= date('d F Y') ?>
+                    <strong>Deadline:</strong> Today until <strong>23:59</strong><br>
+                    <strong>Date:</strong> <?= date('d F Y') ?>
                 </p>
                 <form method="post" id="absenceReasonForm">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="absence_date" value="<?= $today ?>">
 
                     <div class="mb-4">
-                        <label class="block text-sm font-medium mb-1">Jenis Ketidakhadiran *</label>
+                        <label class="block text-sm font-medium mb-1">Absence Type *</label>
                         <select name="absence_type" required class="w-full border rounded-lg p-2">
-                            <option value="">-- Pilih Jenis --</option>
-                            <option value="Absent">Tidak Hadir (Absent)</option>
-                            <option value="Forgot">Lupa Absen (Forgot)</option>
-                            <option value="Sick">Sakit (Sick)</option>
-                            <option value="Leave">Cuti (Leave)</option>
-                            <option value="Others">Lainnya (Others)</option>
+                            <option value="">-- Select Type --</option>
+                            <option value="Absent">Absent</option>
+                            <option value="Forgot">Forgot to Check In</option>
+                            <option value="Sick">Sick</option>
+                            <option value="Leave">Leave</option>
+                            <option value="Others">Others</option>
                         </select>
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-sm font-medium mb-1">Alasan / Penjelasan *</label>
+                        <label class="block text-sm font-medium mb-1">Reason / Explanation *</label>
                         <textarea name="explanation" class="w-full border rounded-lg p-2" rows="3"
-                            placeholder="Jelaskan alasan ketidakhadiran Anda..." required></textarea>
-                        <p class="text-xs text-gray-500 mt-1">Minimal 10 karakter</p>
+                            placeholder="Explain the reason for your absence..." required></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Minimum 10 characters</p>
                     </div>
 
                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                         <p class="text-sm text-yellow-800">
-                            <strong>Perhatian:</strong> Absence reason hanya bisa diinput pada hari yang sama sampai jam 23:59. Besok sudah tidak bisa input untuk hari ini.
+                            <strong>Note:</strong> An absence reason can only be submitted on the same day until 23:59. It cannot be submitted for a past day after midnight.
                         </p>
                     </div>
 
                     <div class="flex justify-end gap-2">
-                        <button type="button" id="closeModalAbsenceReason" class="px-4 py-2 bg-gray-300 rounded-lg">Batal</button>
+                        <button type="button" id="closeModalAbsenceReason" class="px-4 py-2 bg-gray-300 rounded-lg">Cancel</button>
                         <button type="submit" name="submitAbsenceReason" class="px-4 py-2 bg-green-500 hover:bg-green-700 text-white rounded-lg">Submit</button>
                     </div>
                 </form>
@@ -409,23 +378,22 @@ include __DIR__ . '/header.php';
         </div>
 
 
-        <!-- Modal Checkout -->
         <div id="modalCheckout" class="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                <h2 class="text-lg font-bold mb-4">Konfirmasi Check-out</h2>
-                <p class="mb-4">Apakah kamu yakin ingin melakukan check-out sekarang?</p>
+                <h2 class="text-lg font-bold mb-4">Confirm Check-out</h2>
+                <p class="mb-4">Are you sure you want to check out now?</p>
                 <div class="flex justify-end gap-2">
-                    <button type="button" id="closeModalCheckout" class="px-4 py-2 bg-gray-300 rounded-lg">Batal</button>
-                    <button type="button" id="confirmCheckout" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Ya, Checkout</button>
+                    <button type="button" id="closeModalCheckout" class="px-4 py-2 bg-gray-300 rounded-lg">Cancel</button>
+                    <button type="button" id="confirmCheckout" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Yes, Check-out</button>
                 </div>
             </div>
         </div>
 
-        <!-- Modal Check-in -->
         <div id="modalCheckIn" class="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
                 <h2 class="text-lg font-bold mb-4">Check-in Confirmation</h2>
                 <form method="post" id="checkInForm">
+                    <?= csrf_field() ?>
                     <p class="text-sm text-gray-600 mb-3">
                         <strong>Morning:</strong> 07:30 - 11:59 | <strong>Afternoon:</strong> 13:00 - 17:30
                     </p>
@@ -434,8 +402,8 @@ include __DIR__ . '/header.php';
                         <label class="block text-sm font-medium mb-1">Shift</label>
                         <select name="shift" required class="w-full border rounded-lg p-2" id="shiftSelect">
                             <option value="">-- Select Shift --</option>
-                            <option value="Morning">Pagi</option>
-                            <option value="Afternoon">Siang</option>
+                            <option value="Morning">Morning</option>
+                            <option value="Afternoon">Afternoon</option>
                             <option value="WFO">Whole Day at Office (WFO)</option>
                             <option value="WAC">Working at Client (WAC)</option>
                             <option value="WFH">Working from Home (WFH)</option>
@@ -462,24 +430,24 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Modal Leave -->
         <div id="modalLeave" class="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
                 <h2 class="text-lg font-bold mb-4">Leave Form</h2>
                 <form method="post">
+                    <?= csrf_field() ?>
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Type of Leave</label>
                         <select name="leave_type" required class="w-full border rounded-lg p-2">
                             <option value="">-- Select Type --</option>
                             <option value="Sick">Sick / Illness</option>
-                            <option value="Leave">Leave / Cuti</option>
+                            <option value="Leave">Leave</option>
                             <option value="Others">Others</option>
                         </select>
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Explanation / Reason</label>
-                        <textarea name="explanation" class="w-full border rounded-lg p-2" rows="3" placeholder="e.g., Demam tinggi, acara keluarga" required></textarea>
+                        <textarea name="explanation" class="w-full border rounded-lg p-2" rows="3" placeholder="e.g., High fever, family event" required></textarea>
                     </div>
 
                     <div class="flex justify-end gap-2">
@@ -490,8 +458,6 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Monthly Recap (sama seperti sebelumnya) -->
-        <!-- Monthly Recap -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="p-6 md:p-8">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -543,7 +509,6 @@ include __DIR__ . '/header.php';
                                                 <?= htmlspecialchars($record['explanation'] ?? '-') ?>
                                             </span>
 
-                                            <!-- Tooltip -->
                                             <?php if (!empty($record['explanation'])): ?>
                                                 <div class="absolute hidden group-hover:block left-0 top-full mt-1 w-64 bg-gray-900 text-white text-xs rounded-lg p-2 shadow-lg z-50">
                                                     <?= htmlspecialchars($record['explanation']) ?>
@@ -557,14 +522,12 @@ include __DIR__ . '/header.php';
                     </table>
                 </div>
 
-                <!-- Pagination -->
                 <?php if ($totalPages > 1): ?>
                     <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
                         <div class="text-sm text-gray-600 whitespace-nowrap">
                             Showing <?= count($monthly) ?> of <?= $total ?> records (Page <?= $page ?> of <?= $totalPages ?>)
                         </div>
                         <nav class="flex flex-wrap justify-center gap-1">
-                            <!-- First Page -->
                             <?php if ($page > 1): ?>
                                 <a href="?month=<?= htmlspecialchars($month) ?>&page=1"
                                     class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -576,7 +539,6 @@ include __DIR__ . '/header.php';
                                 </span>
                             <?php endif; ?>
 
-                            <!-- Previous -->
                             <?php if ($page > 1): ?>
                                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>"
                                     class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -588,7 +550,6 @@ include __DIR__ . '/header.php';
                                 </span>
                             <?php endif; ?>
 
-                            <!-- Page Numbers -->
                             <?php
                             $startPage = max(1, $page - 2);
                             $endPage = min($totalPages, $page + 2);
@@ -606,7 +567,6 @@ include __DIR__ . '/header.php';
                                 <?php endif; ?>
                             <?php endfor; ?>
 
-                            <!-- Next -->
                             <?php if ($page < $totalPages): ?>
                                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>"
                                     class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -618,7 +578,6 @@ include __DIR__ . '/header.php';
                                 </span>
                             <?php endif; ?>
 
-                            <!-- Last -->
                             <?php if ($page < $totalPages): ?>
                                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>"
                                     class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -673,7 +632,6 @@ include __DIR__ . '/header.php';
                         return false;
                     }
 
-                    // Absence Reason Modal
                     btnAbsenceReason?.addEventListener('click', () => {
                         modalAbsenceReason.classList.remove('hidden');
                     });
@@ -682,23 +640,19 @@ include __DIR__ . '/header.php';
                         modalAbsenceReason.classList.add('hidden');
                     });
 
-                    // Validasi waktu untuk absence reason
                     const absenceReasonForm = document.getElementById('absenceReasonForm');
                     absenceReasonForm?.addEventListener('submit', function(e) {
                         const now = new Date();
                         const hours = now.getHours();
                         const minutes = now.getMinutes();
 
-                        // Cek jika sudah lewat jam 23:59
                         if (hours === 23 && minutes >= 59) {
                             e.preventDefault();
-                            alert('Batas waktu input absence reason sudah lewat (23:59). Tidak bisa input lagi.');
+                            alert('The absence reason submission deadline has passed (23:59). You can no longer submit.');
                             return false;
                         }
                     });
 
-
-                    // Checkout Modal
                     btnCheckout?.addEventListener('click', () => {
                         if (!btnCheckout.disabled) {
                             modalCheckout.classList.remove('hidden');
@@ -713,7 +667,6 @@ include __DIR__ . '/header.php';
                         checkoutForm.submit();
                     });
 
-                    // Check-in Modal
                     shiftSelect?.addEventListener('change', function() {
                         const currentTime = getCurrentTime();
                         if (isLate(this.value, currentTime)) {
@@ -730,13 +683,13 @@ include __DIR__ . '/header.php';
 
                         if (isLate(shift, currentTime) && (!explanation || explanation.length < 10)) {
                             e.preventDefault();
-                            alert('Alasan keterlambatan wajib diisi (minimal 10 karakter).');
+                            alert('A reason for lateness is required (minimum 10 characters).');
                         }
                     });
 
                     btnCheckIn?.addEventListener('click', () => {
                         if (btnCheckIn.disabled) {
-                            alert('Aksi tidak bisa dilakukan.');
+                            alert('This action is not available.');
                         } else {
                             modalCheckIn.classList.remove('hidden');
                         }
@@ -744,10 +697,9 @@ include __DIR__ . '/header.php';
 
                     closeModalCheckIn?.addEventListener('click', () => modalCheckIn.classList.add('hidden'));
 
-                    // Leave Modal
                     btnLeave?.addEventListener('click', () => {
                         if (btnLeave.disabled) {
-                            alert('Aksi tidak bisa dilakukan.');
+                            alert('This action is not available.');
                         } else {
                             modalLeave.classList.remove('hidden');
                         }
