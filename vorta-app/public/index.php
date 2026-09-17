@@ -18,16 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: dashboard.php");
     exit;
   } else {
-    $error = "Email atau password salah.";
+    $error = "Incorrect email or password.";
   }
 }
 ?>
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login - Vorta Tracker</title>
+  <title>Vorta Prodtracker - Login</title>
   <link rel="stylesheet" href="css/output.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input type="email" name="email" required
                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                 placeholder="email@contoh.com">
+                 placeholder="email@example.com">
         </div>
 
         <div>
@@ -70,19 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div>
-          <button type="submit" 
+          <button type="submit"
                   class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
             Sign In
           </button>
         </div>
       </form>
-
-        <!-- <div class="mt-6 pt-6 border-t border-gray-100">
-          <p class="text-xs text-gray-500 text-center">
-            Admin default: admin@vorta.local / admin123<br>
-            (ubah setelah instalasi)
-          </p>
-        </div> -->
     </div>
   </div>
 </body>
