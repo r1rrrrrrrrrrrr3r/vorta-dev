@@ -1,6 +1,4 @@
 <?php
-// lib/db.php
-// Update these credentials for your server
 $DB_HOST = getenv('DB_HOST') ?: 'localhost';
 $DB_NAME = getenv('DB_NAME') ?: 'vorta_prodtracker';
 $DB_USER = getenv('DB_USER') ?: 'root';
