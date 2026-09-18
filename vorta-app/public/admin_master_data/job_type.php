@@ -185,44 +185,56 @@ function page_url($p) {
 </div>
 
 <!-- Tabel Data -->
-<div class="overflow-x-auto">
-  <table class="w-full min-w-[500px]">
-    <thead class="bg-gray-50 border-b">
-      <tr class="text-left text-sm text-gray-600">
-        <th class="px-4 py-3">ID</th>
-        <th class="px-4 py-3">Nama Job Type</th>
-        <th class="px-4 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y">
-      <?php if (empty($job_types)): ?>
-        <tr>
-          <td colspan="3" class="px-4 py-6 text-center text-gray-500">Tidak ada data Job Type ditemukan.</td>
-        </tr>
-      <?php else: ?>
-        <?php foreach ($job_types as $jt): ?>
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3"><?= (int)$jt['job_type_id'] ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($jt['name']) ?></td>
-            <td class="px-4 py-3">
-              <div class="flex gap-2">
-                <button
-                  onclick='editJobType(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
-                  class="px-3 py-1 bg-yellow-500 text-white rounded text-xs hover:brightness-95">
-                  Edit
-                </button>
-                <button
-                  onclick='confirmDelete(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
-                  class="px-3 py-1 bg-red-500 text-white rounded text-xs hover:brightness-95">
-                  Delete
-                </button>
-              </div>
-            </td>
+<div class="bg-white rounded-xl shadow-md overflow-hidden">
+  <div class="p-6 md:p-8">
+    <h2 class="text-xl font-bold text-gray-800 mb-6">Job Types</h2>
+
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left border-b border-gray-200">
+            <th class="pb-3 font-medium text-gray-600">ID</th>
+            <th class="pb-3 font-medium text-gray-600">Nama Job Type</th>
+            <th class="pb-3 font-medium text-gray-600">Action</th>
           </tr>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </tbody>
-  </table>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <?php if (empty($job_types)): ?>
+            <tr>
+              <td colspan="3" class="py-6 text-center text-sm text-gray-400">
+                Tidak ada data Job Type ditemukan.
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($job_types as $jt): ?>
+              <tr class="hover:bg-gray-50 transition">
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= (int)$jt['job_type_id'] ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                  <?= htmlspecialchars($jt['name']) ?>
+                </td>
+                <td class="py-4 whitespace-nowrap space-x-1">
+                  <button
+                    type="button"
+                    onclick='editJobType(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
+                    class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onclick='confirmDelete(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
+                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Pagination -->

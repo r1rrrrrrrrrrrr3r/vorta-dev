@@ -289,50 +289,68 @@ function page_url($p)
 </div>
 
 <!-- Tabel Data -->
-<div class="overflow-x-auto">
-  <table class="w-full min-w-[800px]">
-    <thead class="bg-gray-50 border-b">
-      <tr class="text-left text-sm text-gray-600">
-        <th class="px-4 py-3">ID</th>
-        <th class="px-4 py-3">User</th>
-        <th class="px-4 py-3">Full Name</th>
-        <th class="px-4 py-3">Position</th>
-        <th class="px-4 py-3">Phone</th>
-        <th class="px-4 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y">
-      <?php if (empty($employees)): ?>
-        <tr>
-          <td colspan="6" class="px-4 py-6 text-center text-gray-500">Tidak ada employee ditemukan.</td>
-        </tr>
-      <?php else: ?>
-        <?php foreach ($employees as $e): ?>
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3"><?= htmlspecialchars($e['employee_id'] ?? '-') ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($e['user_name']) ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($e['name']) ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($e['position'] ?? '-') ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($e['phone'] ?? '-') ?></td>
-            <td class="px-4 py-3">
-              <div class="flex gap-2">
-                <button
-                  onclick='editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= json_encode($e['name']) ?>, <?= json_encode($e['position'] ?? '') ?>, <?= json_encode($e['phone'] ?? '') ?>)'
-                  class="px-3 py-1 bg-yellow-500 text-white rounded text-xs hover:brightness-95">
-                  Edit
-                </button>
-                <button
-                  onclick='confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= json_encode($e['name']) ?>)'
-                  class="px-3 py-1 bg-red-500 text-white rounded text-xs hover:brightness-95">
-                  Delete
-                </button>
-              </div>
-            </td>
+<div class="bg-white rounded-xl shadow-md overflow-hidden">
+  <div class="p-6 md:p-8">
+    <h2 class="text-xl font-bold text-gray-800 mb-6">Employee List</h2>
+
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left border-b border-gray-200">
+            <th class="pb-3 font-medium text-gray-600">ID</th>
+            <th class="pb-3 font-medium text-gray-600">User</th>
+            <th class="pb-3 font-medium text-gray-600">Full Name</th>
+            <th class="pb-3 font-medium text-gray-600">Position</th>
+            <th class="pb-3 font-medium text-gray-600">Phone</th>
+            <th class="pb-3 font-medium text-gray-600">Action</th>
           </tr>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </tbody>
-  </table>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <?php if (empty($employees)): ?>
+            <tr>
+              <td colspan="6" class="py-6 text-center text-sm text-gray-400">
+                Tidak ada employee ditemukan.
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($employees as $e): ?>
+              <tr class="hover:bg-gray-50 transition">
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= htmlspecialchars($e['employee_id'] ?? '-') ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= htmlspecialchars($e['user_name']) ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                  <?= htmlspecialchars($e['name']) ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= htmlspecialchars($e['position'] ?? '-') ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= htmlspecialchars($e['phone'] ?? '-') ?>
+                </td>
+                <td class="py-4 whitespace-nowrap space-x-1">
+                  <button
+                    type="button"
+                    onclick='editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= json_encode($e['name']) ?>, <?= json_encode($e['position'] ?? '') ?>, <?= json_encode($e['phone'] ?? '') ?>)'
+                    class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onclick='confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= json_encode($e['name']) ?>)'
+                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Pagination -->

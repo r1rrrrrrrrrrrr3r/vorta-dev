@@ -240,53 +240,66 @@ function page_url($p)
 </div>
 
 <!-- Tabel Data -->
-<div class="overflow-x-auto">
-  <table class="w-full min-w-[700px]">
-    <thead class="bg-gray-50 border-b">
-      <tr class="text-left text-sm text-gray-600">
-        <th class="px-4 py-3">ID</th>
-        <th class="px-4 py-3">Name</th>
-        <th class="px-4 py-3">Email</th>
-        <th class="px-4 py-3">Role</th>
-        <th class="px-4 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y">
-      <?php if (empty($users)): ?>
-        <tr>
-          <td colspan="5" class="px-4 py-6 text-center text-gray-500">Tidak ada user ditemukan.</td>
-        </tr>
-      <?php else: ?>
-        <?php foreach ($users as $u): ?>
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3"><?= (int)$u['user_id'] ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($u['name']) ?></td>
-            <td class="px-4 py-3"><?= htmlspecialchars($u['email']) ?></td>
-            <td class="px-4 py-3">
-              <span class="uppercase text-xs font-medium px-2 py-1 rounded
-                <?= $u['role'] === 'admin' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700' ?>">
-                <?= htmlspecialchars($u['role']) ?>
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex gap-2">
-                <button
-                  onclick='editUser(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>, <?= json_encode($u['email']) ?>, <?= json_encode($u['role']) ?>)'
-                  class="px-3 py-1 bg-yellow-500 text-white rounded text-xs hover:brightness-95">
-                  Edit
-                </button>
-                <button
-                  onclick='confirmDelete(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>)'
-                  class="px-3 py-1 bg-red-500 text-white rounded text-xs hover:brightness-95">
-                  Delete
-                </button>
-              </div>
-            </td>
+<div class="bg-white rounded-xl shadow-md overflow-hidden">
+  <div class="p-6 md:p-8">
+    <h2 class="text-xl font-bold text-gray-800 mb-6">User Management</h2>
+
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-left border-b border-gray-200">
+            <th class="pb-3 font-medium text-gray-600">ID</th>
+            <th class="pb-3 font-medium text-gray-600">Name</th>
+            <th class="pb-3 font-medium text-gray-600">Email</th>
+            <th class="pb-3 font-medium text-gray-600">Role</th>
+            <th class="pb-3 font-medium text-gray-600">Action</th>
           </tr>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </tbody>
-  </table>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <?php if (empty($users)): ?>
+            <tr>
+              <td colspan="5" class="py-6 text-center text-sm text-gray-400">
+                Tidak ada user ditemukan.
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($users as $u): ?>
+              <tr class="hover:bg-gray-50 transition">
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= (int)$u['user_id'] ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                  <?= htmlspecialchars($u['name']) ?>
+                </td>
+                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+                  <?= htmlspecialchars($u['email']) ?>
+                </td>
+                <td class="py-4 whitespace-nowrap">
+                  <span class="px-2.5 py-1 rounded-full text-xs font-medium <?= $u['role'] === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800' ?>">
+                    <?= htmlspecialchars($u['role']) ?>
+                  </span>
+                </td>
+                <td class="py-4 whitespace-nowrap space-x-1">
+                  <button
+                    type="button"
+                    onclick='editUser(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>, <?= json_encode($u['email']) ?>, <?= json_encode($u['role']) ?>)'
+                    class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onclick='confirmDelete(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>)'
+                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Pagination -->
