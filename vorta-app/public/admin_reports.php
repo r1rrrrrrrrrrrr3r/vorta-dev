@@ -292,7 +292,7 @@ include __DIR__ . '/header.php';
             </h2>
             <button onclick="location.reload()"
               class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap">
-              🔄 Refresh
+              Refresh
             </button>
           </div>
 
@@ -333,7 +333,7 @@ include __DIR__ . '/header.php';
 
         <?php if (!$shortRows): ?>
           <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-            <div class="text-green-600 text-4xl mb-2">🎉</div>
+            <div class="text-green-600 text-4xl mb-2"></div>
             <p class="text-green-800 font-medium text-lg">All staff have completed their daily reports!</p>
             <p class="text-green-600 text-sm mt-1">Every active employee has submitted at least 2 reports today.</p>
           </div>

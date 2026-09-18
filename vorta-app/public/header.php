@@ -57,7 +57,7 @@ require_once __DIR__ . '/../lib/auth.php';
             <?php else: ?>
               <a href="attendance.php"
                 class="px-3 py-2 text-sm font-medium rounded-md transition-all <?= basename($_SERVER['PHP_SELF']) === 'attendance.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">
-                Absen
+                Attendance
               </a>
               <a href="report_form.php"
                 class="px-3 py-2 text-sm font-medium rounded-md transition-all <?= basename($_SERVER['PHP_SELF']) === 'report_form.php' ? 'text-indigo-700 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100' ?>">

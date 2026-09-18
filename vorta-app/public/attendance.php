@@ -244,7 +244,7 @@ include __DIR__ . '/header.php';
                             <button type="button" id="btnAbsenceReason"
                                 class="px-4 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap hover:opacity-85 hover:cursor-pointer"
                                 style="background-color: #9333ea; color: white;">
-                                📝 Input Absence Reason
+                                Input Absence Reason
                             </button>
 
                         <?php endif; ?>
@@ -673,6 +673,12 @@ include __DIR__ . '/header.php';
                             explanationContainer.classList.remove('hidden');
                         } else {
                             explanationContainer.classList.add('hidden');
+                        }
+
+                        const locationMap = { WFO: 'Office', WAC: 'Client', WFH: 'Home', WFA: 'Anywhere' };
+                        const locationInput = document.querySelector('#modalCheckIn input[name="location"]');
+                        if (locationInput && locationMap[this.value]) {
+                            locationInput.value = locationMap[this.value];
                         }
                     });
 
