@@ -159,7 +159,7 @@ $workforces = $workforce_stmt->fetchAll();
                             class="w-full md:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base font-semibold rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200 ease-in-out transform hover:scale-105">
                             Update Report
                         </button>
-                        <a href="reports_my.php" class="w-full md:w-auto px-8 py-3 bg-gray-400 hover:bg-gray-500 text-sm md:text-base text-white font-semibold rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-200 ease-in-out transform hover:scale-105">
+                        <a href="my_reports.php" class="w-full md:w-auto px-8 py-3 bg-gray-400 hover:bg-gray-500 text-sm md:text-base text-white font-semibold rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-200 ease-in-out transform hover:scale-105">
                             Back to Report
                         </a>
                     </div>

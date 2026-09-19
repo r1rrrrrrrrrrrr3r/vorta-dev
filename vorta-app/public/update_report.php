@@ -68,8 +68,8 @@ $result = $stmt->execute([
 ]);
 
 if ($result) {
-    header("Location: reports_my.php?month=" . urlencode(date('Y-m', strtotime($report_date))) . "&edit=success");
+    header("Location: my_reports.php?month=" . urlencode(date('Y-m', strtotime($report_date))) . "&edit=success");
 } else {
-    header("Location: reports_my.php?edit=error");
+    header("Location: my_reports.php?edit=error");
 }
 exit;

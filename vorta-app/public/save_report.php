@@ -55,7 +55,10 @@ if (!$check->fetch()) {
 $proof_image_path = null;
 $max_size = 1048576; // 1 MB
 
-if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] === UPLOAD_ERR_OK) {
+if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+    if ($_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
+        die("Upload gagal, kode error PHP: " . $_FILES['proof_image']['error']);
+    }
     $file = $_FILES['proof_image'];
 
     // 1. Cek ukuran file
@@ -112,7 +115,6 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] === UPLOAD_
     $proof_image_path = '../uploads/' . $new_filename;
 }
 
-// ✅ Simpan ke database
 try {
     $stmt = $pdo->prepare("
         INSERT INTO production_reports 
@@ -128,10 +130,10 @@ try {
         $status,
         $proof_link,
         $proof_image_path,
-        $workforce_id // ✅ Tambahkan di sini
+        $workforce_id 
     ]);
 
-    header("Location: reports_my.php?success=report_saved");
+    header("Location: my_reports.php?success=report_saved");
     exit;
 } catch (PDOException $e) {
     die("Gagal menyimpan laporan: " . $e->getMessage());

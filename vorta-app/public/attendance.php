@@ -301,12 +301,20 @@ include __DIR__ . '/header.php';
 
                 <?php if ($attendance): ?>
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+                        <?php
+                        $todayStatusLabel = $attendance['status'] ?: 'Unknown';
+                        $todayStatusClass = match ($attendance['status']) {
+                            'Present' => 'text-green-600',
+                            'Late' => 'text-yellow-600',
+                            'Leave', 'Sick', 'Others' => 'text-blue-600',
+                            'Absent', 'Forgot' => 'text-red-600',
+                            default => 'text-gray-500',
+                        };
+                        ?>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <p class="text-sm text-gray-500">Status</p>
-                            <p class="font-medium
-                                <?= $attendance['status'] === 'Present' ? 'text-green-600' : ($attendance['status'] === 'Late' ? 'text-yellow-600' :
-                                    'text-red-600') ?>">
-                                <?= htmlspecialchars($attendance['status']) ?>
+                            <p class="font-medium <?= $todayStatusClass ?>">
+                                <?= htmlspecialchars($todayStatusLabel) ?>
                             </p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
@@ -494,11 +502,19 @@ include __DIR__ . '/header.php';
                                         <td class="py-4"><?= htmlspecialchars($record['date']) ?></td>
                                         <td class="py-4"><?= $record['check_in'] ?? '-' ?></td>
                                         <td class="py-4"><?= $record['check_out'] ?? '-' ?></td>
+                                        <?php
+                                        $recordStatusLabel = $record['status'] ?: 'Unknown';
+                                        $recordStatusClass = match ($record['status']) {
+                                            'Present' => 'bg-green-100 text-green-800',
+                                            'Late' => 'bg-yellow-100 text-yellow-800',
+                                            'Leave', 'Sick', 'Others' => 'bg-blue-100 text-blue-800',
+                                            'Absent', 'Forgot' => 'bg-red-100 text-red-800',
+                                            default => 'bg-gray-100 text-gray-600',
+                                        };
+                                        ?>
                                         <td class="py-4">
-                                            <span class="px-2.5 py-1 rounded-full text-xs font-medium
-                                                <?= $record['status'] === 'Present' ? 'bg-green-100 text-green-800' : ($record['status'] === 'Late' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800') ?>">
-                                                <?= htmlspecialchars($record['status']) ?>
+                                            <span class="px-2.5 py-1 rounded-full text-xs font-medium <?= $recordStatusClass ?>">
+                                                <?= htmlspecialchars($recordStatusLabel) ?>
                                             </span>
                                         </td>
                                         <td class="py-4"><?= htmlspecialchars($record['location'] ?? '-') ?></td>
