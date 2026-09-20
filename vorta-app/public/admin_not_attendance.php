@@ -84,8 +84,6 @@ include __DIR__ . '/header.php';
   <div class="bg-white rounded-xl shadow-md overflow-hidden">
     <div class="p-6 md:p-8">
       <h1 class="text-2xl font-bold text-gray-800 mb-2">Attendance Report</h1>
-
-      <!-- Filter Tanggal -->
       <form method="GET" class="mb-6">
         <label for="date" class="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -109,8 +107,6 @@ include __DIR__ . '/header.php';
       </form>
 
       <p class="text-sm text-gray-600 mb-6">Report for: <strong><?= htmlspecialchars($selected_date) ?></strong></p>
-
-      <!-- Statistics -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-center">
         <div class="bg-blue-50 p-4 rounded-lg">
           <p class="font-semibold text-blue-800">Total Employees</p>
@@ -160,8 +156,7 @@ include __DIR__ . '/header.php';
             </tbody>
           </table>
         </div>
-
-        <!-- Pagination -->
+        
         <?php if ($totalPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
@@ -175,7 +170,6 @@ include __DIR__ . '/header.php';
                 }
               ?>
 
-              <!-- First Page Button -->
               <?php if ($page > 1): ?>
                 <a href="<?= getPaginationUrl(1, $selected_date) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -189,7 +183,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Previous Button -->
               <?php if ($page > 1): ?>
                 <a href="<?= getPaginationUrl($page - 1, $selected_date) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -203,7 +196,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Page Numbers -->
               <div class="hidden xs:flex gap-1">
                 <?php 
                 $startPage = max(1, $page - 2);
@@ -221,12 +213,10 @@ include __DIR__ . '/header.php';
                 <?php endfor; ?>
               </div>
 
-              <!-- Mobile Page Indicator -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $page ?>
               </div>
 
-              <!-- Next Button -->
               <?php if ($page < $totalPages): ?>
                 <a href="<?= getPaginationUrl($page + 1, $selected_date) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -240,7 +230,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Last Page Button -->
               <?php if ($page < $totalPages): ?>
                 <a href="<?= getPaginationUrl($totalPages, $selected_date) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">

@@ -2,8 +2,6 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_admin();
-
-// Pastikan session aktif
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,14 +9,11 @@ if (session_status() === PHP_SESSION_NONE) {
 $success = $_SESSION['success'] ?? '';
 $error = $_SESSION['error'] ?? '';
 unset($_SESSION['success'], $_SESSION['error']);
-
-// --- Search & Pagination
 $search = trim($_GET['search'] ?? '');
 $perPage = 10;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
-// --- Handle Create & Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     $name = trim($_POST['name']);
     $action = $_POST['action'] ?? '';
@@ -42,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
                 }
             }
 
-            // Redirect dengan JavaScript
             $params = ['tab' => 'job_type', 'page' => $page];
             if ($search) $params['search'] = $search;
             $redirect = 'admin_master_data.php?' . http_build_query($params);
@@ -60,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     }
 }
 
-// --- Handle Delete
 if (isset($_GET['delete_job_type'])) {
     $job_type_id = (int)$_GET['delete_job_type'];
     try {
@@ -83,7 +76,6 @@ if (isset($_GET['delete_job_type'])) {
     exit;
 }
 
-// --- Build WHERE clause for search
 $where = [];
 $params = [];
 if ($search) {
@@ -91,8 +83,6 @@ if ($search) {
     $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-
-// --- Total count
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM job_type $whereSql");
 foreach ($params as $i => $val) {
     $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);
@@ -101,8 +91,6 @@ $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalJobTypes = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalJobTypes / $perPage);
-
-// --- Fetch data with pagination
 $sql = "SELECT * FROM job_type $whereSql ORDER BY name ASC LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
 $index = 1;
@@ -113,8 +101,6 @@ $stmt->bindValue($index++, $perPage, PDO::PARAM_INT);
 $stmt->bindValue($index, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $job_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// --- Helper untuk pagination
 function page_url($p) {
     $q = $_GET;
     $q['page'] = $p;
@@ -122,7 +108,6 @@ function page_url($p) {
 }
 ?>
 
-<!-- Messages -->
 <?php if ($success): ?>
   <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded">
     <?= htmlspecialchars($success) ?>
@@ -134,7 +119,6 @@ function page_url($p) {
   </div>
 <?php endif; ?>
 
-<!-- Form Tambah/Edit -->
 <div id="job-type-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
   <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
     Added New Job Type
@@ -162,7 +146,6 @@ function page_url($p) {
   </form>
 </div>
 
-<!-- Search Form -->
 <div class="mb-6">
   <form method="GET" class="flex flex-col sm:flex-row gap-3">
     <input type="hidden" name="tab" value="job_type">
@@ -183,8 +166,6 @@ function page_url($p) {
     <?php endif; ?>
   </form>
 </div>
-
-<!-- Tabel Data -->
 <div class="bg-white rounded-xl shadow-md overflow-hidden">
   <div class="p-6 md:p-8">
     <h2 class="text-xl font-bold text-gray-800 mb-6">Job Types</h2>
@@ -237,7 +218,6 @@ function page_url($p) {
   </div>
 </div>
 
-<!-- Pagination -->
 <?php if ($totalPages > 1): ?>
   <nav class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
     <div class="text-sm text-gray-600">
@@ -245,7 +225,7 @@ function page_url($p) {
     </div>
 
     <ul class="flex flex-wrap items-center gap-2">
-      <!-- Tombol First -->
+
       <li>
         <a href="<?= $page > 1 ? page_url(1) : 'javascript:void(0)' ?>"
            class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -254,7 +234,6 @@ function page_url($p) {
         </a>
       </li>
 
-      <!-- Tombol Prev -->
       <li>
         <a href="<?= $page > 1 ? page_url($page - 1) : 'javascript:void(0)' ?>"
            class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -263,7 +242,6 @@ function page_url($p) {
         </a>
       </li>
 
-      <!-- Nomor Halaman -->
       <?php
       $start = max(1, $page - 2);
       $end   = min($totalPages, $page + 2);
@@ -288,7 +266,6 @@ function page_url($p) {
       }
       ?>
 
-      <!-- Tombol Next -->
       <li>
         <a href="<?= $page < $totalPages ? page_url($page + 1) : 'javascript:void(0)' ?>"
            class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -297,7 +274,6 @@ function page_url($p) {
         </a>
       </li>
 
-      <!-- Tombol Last -->
       <li>
         <a href="<?= $page < $totalPages ? page_url($totalPages) : 'javascript:void(0)' ?>"
            class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -309,23 +285,18 @@ function page_url($p) {
   </nav>
 <?php endif; ?>
 
-
-<!-- JavaScript -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// Fungsi edit + scroll ke form
+
 function editJobType(id, name) {
     document.getElementById('form-title').textContent = 'Edit Job Type';
     document.getElementById('name').value = name;
     document.getElementById('action-input').value = 'update';
     document.getElementById('job-type-id-input').value = id;
     document.getElementById('cancel-edit').classList.remove('hidden');
-
-    // Scroll ke form
     document.getElementById('job-type-form-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// Fungsi cancel edit
 document.getElementById('cancel-edit')?.addEventListener('click', function () {
     document.querySelector('form').reset();
     document.getElementById('form-title').textContent = 'Tambah Job Type Baru';
@@ -334,7 +305,6 @@ document.getElementById('cancel-edit')?.addEventListener('click', function () {
     this.classList.add('hidden');
 });
 
-// Konfirmasi hapus dengan SweetAlert
 function confirmDelete(id, name) {
     Swal.fire({
         title: 'Yakin hapus?',
@@ -347,7 +317,6 @@ function confirmDelete(id, name) {
         cancelButtonText: 'Batal'
     }).then((result) => {
         if (result.isConfirmed) {
-            // Redirect ke URL delete
             const url = new URL(window.location.href);
             url.searchParams.set('delete_job_type', id);
             window.location.href = url.toString();

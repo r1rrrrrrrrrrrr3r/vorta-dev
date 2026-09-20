@@ -41,7 +41,7 @@ include __DIR__ . '/header.php';
 
 <head>
     <meta charset="UTF-8">
-    <title>vorta Prodtracker - My Profile</title>
+    <title>Vorta Prodtracker - My Profile</title>
     <link rel="stylesheet" href="css/output.css">
 </head>
 

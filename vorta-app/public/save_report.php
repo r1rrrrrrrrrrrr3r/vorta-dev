@@ -6,85 +6,74 @@ require_login();
 $user_id = $_SESSION['user']['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die("Akses ditolak.");
+    die("Access denied.");
 }
 
-// Ambil data form
 $report_date = $_POST['report_date'] ?? date('Y-m-d');
 $job_type_id = (int)$_POST['job_type'];
 $status = $_POST['status'] ?? 'Progress';
 $title = trim($_POST['title']);
 $description = trim($_POST['description']) ?: null;
 $proof_link = trim($_POST['proof_link']) ?: null;
-$workforce_id = (int)$_POST['workforce_id']; // ✅ Tambahkan workforce_id
+$workforce_id = (int)$_POST['workforce_id'];
 
-// Validasi input wajib
 if (empty($title) || empty($report_date) || $job_type_id <= 0) {
-    die("Data tidak lengkap.");
+    die("Incomplete data.");
 }
 
-// Ambil nama job_type dari ID
 $stmt_lookup = $pdo->prepare("SELECT name FROM job_type WHERE job_type_id = ?");
 $stmt_lookup->execute([$job_type_id]);
 $job_type_row = $stmt_lookup->fetch();
 
 if (!$job_type_row) {
-    die("Jenis pekerjaan tidak valid.");
+    die("Invalid job type.");
 }
 $job_type = $job_type_row['name'];
 
-// Validasi: Pastikan workforce_id dimiliki oleh user ini
 $employeeStmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
 $employeeStmt->execute([$user_id]);
 $employee = $employeeStmt->fetch();
 
 if (!$employee) {
-    die("Data karyawan tidak ditemukan.");
+    die("Employee data not found.");
 }
 
 $employee_id = $employee['employee_id'];
 
-// Validasi: Pastikan workforce_id ada di tabel work_force
 $check = $pdo->prepare("SELECT 1 FROM work_force WHERE workforce_id = ?");
 $check->execute([$workforce_id]);
 if (!$check->fetch()) {
-    die("Work Force tidak valid.");
+    die("Invalid workforce.");
 }
 
-// Upload & Kompres Gambar
 $proof_image_path = null;
-$max_size = 1048576; // 1 MB
+$max_size = 1048576;
 
 if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_ERR_NO_FILE) {
     if ($_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
-        die("Upload gagal, kode error PHP: " . $_FILES['proof_image']['error']);
+        die("Upload failed, PHP error code: " . $_FILES['proof_image']['error']);
     }
     $file = $_FILES['proof_image'];
 
-    // 1. Cek ukuran file
     if ($file['size'] > $max_size) {
-        die("Ukuran file gambar tidak boleh lebih dari 1 MB.");
+        die("Image file size must not exceed 1 MB.");
     }
 
-    // 2. Cek tipe file
     $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     $mime = mime_content_type($file['tmp_name']);
     if (!in_array($mime, $allowed_types)) {
-        die("Format gambar tidak didukung. Gunakan JPG, PNG, atau WebP.");
+        die("Unsupported image format. Use JPG, PNG, or WebP.");
     }
 
-    // 3. Folder upload
     $upload_dir = __DIR__ . '/../uploads/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }
 
-    // 4. Buat nama file unik
     $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
     $new_filename = 'report_' . time() . '_' . uniqid() . '.' . ($mime === 'image/webp' ? 'webp' : ($mime === 'image/png' ? 'png' : 'jpg'));
     $target_path = $upload_dir . $new_filename;
 
-    // 5. Kompres & Simpan
     $success = false;
     switch ($mime) {
         case 'image/jpeg':
@@ -109,7 +98,7 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
     if (isset($image)) imagedestroy($image);
 
     if (!$success) {
-        die("Gagal memproses gambar.");
+        die("Failed to process image.");
     }
 
     $proof_image_path = '../uploads/' . $new_filename;
@@ -136,5 +125,5 @@ try {
     header("Location: my_reports.php?success=report_saved");
     exit;
 } catch (PDOException $e) {
-    die("Gagal menyimpan laporan: " . $e->getMessage());
+    die("Failed to save report: " . $e->getMessage());
 }

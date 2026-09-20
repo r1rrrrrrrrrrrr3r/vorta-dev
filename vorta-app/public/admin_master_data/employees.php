@@ -3,7 +3,6 @@ require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_admin();
 
-// Pastikan session aktif
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -12,13 +11,11 @@ $success = $_SESSION['success'] ?? '';
 $error = $_SESSION['error'] ?? '';
 unset($_SESSION['success'], $_SESSION['error']);
 
-// --- Search & Pagination
 $search = trim($_GET['search'] ?? '');
 $perPage = 10;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
-// --- Ambil daftar nilai ENUM dari kolom `position` di tabel `employees`
 function getEnumValues($pdo, $table, $column)
 {
   $stmt = $pdo->query("
@@ -43,7 +40,6 @@ function getEnumValues($pdo, $table, $column)
 
 $position_enum = getEnumValues($pdo, 'employees', 'position');
 
-// --- Handle Create & Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   $name = trim($_POST['name'] ?? '');
   $position = trim($_POST['position'] ?? '');
@@ -51,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   $action = $_POST['action'] ?? '';
   $employee_id = (int)($_POST['employee_id'] ?? 0);
 
-  // Ambil user_id: dari dropdown, atau dari hidden saat edit
   $user_id = $_POST['user_id'] ?? 0;
   if ($action === 'update' && empty($user_id) && !empty($_POST['current_user_id'])) {
     $user_id = (int)$_POST['current_user_id'];
@@ -63,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   } else {
     try {
       if ($action === 'create') {
-        // Cek apakah user_id sudah ada
+
         $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
         $check->execute([$user_id]);
         if ($check->fetch()) {
@@ -74,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
           $_SESSION['success'] = "Employee berhasil ditambahkan.";
         }
       } elseif ($action === 'update') {
-        // Cek employee_id valid
+
         $check = $pdo->prepare("SELECT user_id FROM employees WHERE employee_id = ?");
         $check->execute([$employee_id]);
         $existing = $check->fetch();
@@ -82,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         if (!$existing) {
           $_SESSION['error'] = "Employee tidak ditemukan.";
         } else {
-          // Cek jika user_id diubah ke yang sudah dipakai
+
           if ($existing['user_id'] != $user_id) {
             $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
             $check_user->execute([$user_id]);
@@ -105,7 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
     }
   }
 
-  // Redirect dengan JavaScript
   $params = ['tab' => 'employees', 'page' => $page];
   if ($search) $params['search'] = $search;
   $redirect = 'admin_master_data.php?' . http_build_query($params);
@@ -113,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   exit;
 }
 
-// --- Handle Delete
 if (isset($_GET['delete_emp'])) {
   $employee_id = (int)$_GET['delete_emp'];
   try {
@@ -131,7 +124,6 @@ if (isset($_GET['delete_emp'])) {
   exit;
 }
 
-// --- Build WHERE clause for search
 $where = [];
 $params = [];
 if ($search) {
@@ -139,8 +131,6 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-
-// --- Total count
 $totalSql = "SELECT COUNT(*) AS cnt FROM employees e $whereSql";
 $totalStmt = $pdo->prepare($totalSql);
 foreach ($params as $i => $val) {
@@ -150,8 +140,6 @@ $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalEmployees = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalEmployees / $perPage);
-
-// --- Fetch employees with user name
 $sql = "
     SELECT e.employee_id, e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
     FROM employees e 
@@ -170,8 +158,6 @@ $stmt->bindValue($index++, $perPage, PDO::PARAM_INT);
 $stmt->bindValue($index, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// --- Ambil semua user, plus status apakah sudah jadi employee
 $allUsersStmt = $pdo->query("
     SELECT 
         u.user_id, 
@@ -182,8 +168,6 @@ $allUsersStmt = $pdo->query("
     ORDER BY u.name
 ");
 $all_users = $allUsersStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// --- Helper for pagination URL
 function page_url($p)
 {
   $q = $_GET;
@@ -192,7 +176,6 @@ function page_url($p)
 }
 ?>
 
-<!-- Messages -->
 <?php if ($success): ?>
   <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded">
     <?= htmlspecialchars($success) ?>
@@ -204,7 +187,6 @@ function page_url($p)
   </div>
 <?php endif; ?>
 
-<!-- Form Tambah/Edit -->
 <div class="bg-gray-50 p-6 rounded-lg mb-8">
   <div class="flex flex-row justify-between">
     <h2 class="text-lg font-semibold text-gray-800 mb-4" id="emp-form-title">
@@ -267,7 +249,6 @@ function page_url($p)
   </form>
 </div>
 
-<!-- Search Form -->
 <div class="mb-6">
   <form method="GET" class="flex flex-col sm:flex-row gap-3">
     <input type="hidden" name="tab" value="employees">
@@ -288,7 +269,6 @@ function page_url($p)
   </form>
 </div>
 
-<!-- Tabel Data -->
 <div class="bg-white rounded-xl shadow-md overflow-hidden">
   <div class="p-6 md:p-8">
     <h2 class="text-xl font-bold text-gray-800 mb-6">Employee List</h2>
@@ -353,7 +333,6 @@ function page_url($p)
   </div>
 </div>
 
-<!-- Pagination -->
 <?php if ($totalPages > 1): ?>
   <nav class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
     <div class="text-sm text-gray-600">
@@ -361,7 +340,6 @@ function page_url($p)
     </div>
 
     <ul class="flex flex-wrap items-center gap-2">
-      <!-- Tombol First -->
       <li>
         <a href="<?= $page > 1 ? page_url(1) : 'javascript:void(0)' ?>"
           class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -370,7 +348,6 @@ function page_url($p)
         </a>
       </li>
 
-      <!-- Tombol Prev -->
       <li>
         <a href="<?= $page > 1 ? page_url($page - 1) : 'javascript:void(0)' ?>"
           class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -379,7 +356,6 @@ function page_url($p)
         </a>
       </li>
 
-      <!-- Nomor Halaman -->
       <?php
       $start = max(1, $page - 2);
       $end   = min($totalPages, $page + 2);
@@ -404,7 +380,6 @@ function page_url($p)
       }
       ?>
 
-      <!-- Tombol Next -->
       <li>
         <a href="<?= $page < $totalPages ? page_url($page + 1) : 'javascript:void(0)' ?>"
           class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -413,7 +388,6 @@ function page_url($p)
         </a>
       </li>
 
-      <!-- Tombol Last -->
       <li>
         <a href="<?= $page < $totalPages ? page_url($totalPages) : 'javascript:void(0)' ?>"
           class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
@@ -425,8 +399,6 @@ function page_url($p)
   </nav>
 <?php endif; ?>
 
-
-<!-- JavaScript -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   function editEmployee(id, user_id, name, position, phone) {
@@ -454,7 +426,6 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
-  // Fungsi konfirmasi hapus dengan SweetAlert
   function confirmDeleteEmployee(employeeId, employeeName) {
     Swal.fire({
       title: 'Yakin hapus?',

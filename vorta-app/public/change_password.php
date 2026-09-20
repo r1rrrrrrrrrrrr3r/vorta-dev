@@ -6,14 +6,10 @@ require_login();
 $user_id = $_SESSION['user']['user_id'] ?? 0;
 $error = '';
 $success = '';
-
-// Reset password
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $current_password = trim($_POST['current_password']);
     $new_password = trim($_POST['new_password']);
     $confirm_password = trim($_POST['confirm_password']);
-
-    // Validasi input
     if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
         $error = "Semua kolom harus diisi.";
     } elseif ($new_password !== $confirm_password) {
@@ -21,7 +17,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($new_password) < 6) {
         $error = "Password baru minimal 6 karakter.";
     } else {
-        // Ambil password lama dari database
         $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE user_id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch();
@@ -31,11 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!password_verify($current_password, $user['password_hash'])) {
             $error = "Password lama salah.";
         } else {
-            // Update password baru (di-hash)
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
             $update = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ?");
             $update->execute([$hashed_password, $user_id]);
-
             $success = "Password berhasil diubah!";
         }
     }

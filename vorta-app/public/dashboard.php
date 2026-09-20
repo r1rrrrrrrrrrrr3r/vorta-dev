@@ -6,8 +6,6 @@ require_login();
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
-
-// totals per user
 $stmt = $pdo->prepare("
   SELECT u.user_id, u.name, u.role,
          COALESCE(SUM(pr.report_date BETWEEN ? AND ?), 0) as dummy,
@@ -20,13 +18,9 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$start, $end, $start, $end]);
 $users = $stmt->fetchAll();
-
-// type distribution
 $types = $pdo->prepare("SELECT job_type, COUNT(*) c FROM production_reports WHERE report_date BETWEEN ? AND ? GROUP BY job_type ORDER BY c DESC");
 $types->execute([$start, $end]);
 $typeRows = $types->fetchAll();
-
-// Pagination
 $limit = 5; 
 $page  = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -34,8 +28,6 @@ $offset = ($page - 1) * $limit;
 $totalData = count($users);
 $totalPage = ceil($totalData / $limit);
 $usersPage = array_slice($users, $offset, $limit);
-
-// Determine page range for display
 $startPage = max(1, $page - 2);
 $endPage = min($totalPage, $startPage + 4);
 if ($endPage - $startPage < 4) {
@@ -59,7 +51,6 @@ if ($endPage - $startPage < 4) {
 <?php include __DIR__ . '/header.php'; ?>
 
 <div class="container mx-auto px-4 py-8">
-  <!-- Header -->
   <header class="mb-8">
     <h1 class="text-xl sm:text-2xl md:text-3xl sm:text-start text-center font-bold text-gray-800">
       Production Dashboard
@@ -75,11 +66,7 @@ if ($endPage - $startPage < 4) {
       </form>
     </div>
   </header>
-
-  <!-- GRID: Employee Performance & Job Distribution -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    <!-- Employee Performance -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Employee Performance</h2>
@@ -120,15 +107,12 @@ if ($endPage - $startPage < 4) {
             </tbody>
           </table>
         </div>
-
-        <!-- Pagination -->
         <?php if ($totalPage > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Page <?= $page ?> of <?= $totalPage ?>
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page Button -->
               <?php if ($page > 1): ?>
                 <a href="?page=1&month=<?= htmlspecialchars($month) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -141,8 +125,6 @@ if ($endPage - $startPage < 4) {
                   <span class="sm:hidden">First</span>
                 </span>
               <?php endif; ?>
-
-              <!-- Previous Button -->
               <?php if ($page > 1): ?>
                 <a href="?page=<?= $page - 1 ?>&month=<?= htmlspecialchars($month) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -155,8 +137,6 @@ if ($endPage - $startPage < 4) {
                   <span class="sm:hidden">&lt;</span>
                 </span>
               <?php endif; ?>
-
-              <!-- Page Numbers - Hidden on mobile if many pages -->
               <div class="hidden xs:flex gap-1">
                 <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                   <a href="?page=<?= $i ?>&month=<?= htmlspecialchars($month) ?>"
@@ -166,13 +146,9 @@ if ($endPage - $startPage < 4) {
                   </a>
                 <?php endfor; ?>
               </div>
-
-              <!-- Page indicator for mobile -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $page ?>
               </div>
-
-              <!-- Next Button -->
               <?php if ($page < $totalPage): ?>
                 <a href="?page=<?= $page + 1 ?>&month=<?= htmlspecialchars($month) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -185,8 +161,6 @@ if ($endPage - $startPage < 4) {
                   <span class="sm:hidden">&gt;</span>
                 </span>
               <?php endif; ?>
-
-              <!-- Last Page Button -->
               <?php if ($page < $totalPage): ?>
                 <a href="?page=<?= $totalPage ?>&month=<?= htmlspecialchars($month) ?>"
                    class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -204,8 +178,6 @@ if ($endPage - $startPage < 4) {
         <?php endif; ?>
       </div>
     </div>
-
-    <!-- Job Distribution -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Job Type Distribution</h2>
@@ -215,13 +187,11 @@ if ($endPage - $startPage < 4) {
         <p class="mt-4 text-sm text-gray-500">Rule: Minimum 2 items per day per staff.</p>
       </div>
     </div>
-
-  </div> <!-- end grid -->
-
-</div> <!-- end container -->
+  </div> 
+</div> 
 
 <script>
-  // Pie Chart
+
   const pieLabels = <?php echo json_encode(array_column($typeRows, 'job_type')); ?>;
   const pieData = <?php echo json_encode(array_map('intval', array_column($typeRows, 'c'))); ?>;
 

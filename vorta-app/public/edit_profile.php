@@ -7,11 +7,10 @@ $user_id = $_SESSION['user']['user_id'] ?? 0;
 $error = '';
 $success = '';
 
-// Ambil data pengguna: email dari users, name & phone dari employees
 $stmt = $pdo->prepare("
     SELECT 
         u.email,
-        COALESCE(e.name, u.name) AS name,  -- Jika nama di employees kosong, pakai dari users
+        COALESCE(e.name, u.name) AS name,
         e.phone
     FROM users u 
     LEFT JOIN employees e ON u.user_id = e.user_id
@@ -21,54 +20,46 @@ $stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
 if (!$user) {
-    die("User tidak ditemukan.");
+    die("User not found.");
 }
 
 $name = $user['name'];
 $email = $user['email'];
 $phone = $user['phone'] ?? '';
 
-// Proses saat form disubmit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
 
-    // Validasi
     if (empty($name) || empty($email)) {
-        $error = "Nama dan email harus diisi.";
+        $error = "Name and email are required.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Format email tidak valid.";
+        $error = "Invalid email format.";
     } else {
-        // Cek apakah email sudah digunakan oleh user lain
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
         $check->execute([$email, $user_id]);
         if ($check->fetch()) {
-            $error = "Email sudah digunakan oleh pengguna lain.";
+            $error = "Email is already in use by another user.";
         } else {
-            // Update email di tabel users
             $updateUser = $pdo->prepare("UPDATE users SET email = ? WHERE user_id = ?");
             $updateUser->execute([$email, $user_id]);
 
-            // Update atau insert ke tabel employees
             $checkEmp = $pdo->prepare("SELECT user_id FROM employees WHERE user_id = ?");
             $checkEmp->execute([$user_id]);
 
             if ($checkEmp->fetch()) {
-                // Sudah ada, update
                 $updateEmp = $pdo->prepare("UPDATE employees SET name = ?, phone = ? WHERE user_id = ?");
                 $updateEmp->execute([$name, $phone, $user_id]);
             } else {
-                // Belum ada, insert baru
                 $insertEmp = $pdo->prepare("INSERT INTO employees (user_id, name, phone) VALUES (?, ?, ?)");
                 $insertEmp->execute([$user_id, $name, $phone]);
             }
 
-            // Perbarui session
             $_SESSION['user']['name'] = $name;
             $_SESSION['user']['email'] = $email;
 
-            $success = "Profile berhasil diperbarui!";
+            $success = "Profile updated successfully!";
         }
     }
 }
@@ -107,7 +98,6 @@ include __DIR__ . '/header.php';
         <?php endif; ?>
 
         <form method="POST" class="space-y-6">
-            <!-- Nama -->
             <div>
                 <label class="block text-sm font-medium text-gray-700">Full Name</label>
                 <input type="text" name="name" value="<?= htmlspecialchars($name) ?>"
@@ -115,7 +105,6 @@ include __DIR__ . '/header.php';
                        required>
             </div>
 
-            <!-- Email -->
             <div>
                 <label class="block text-sm font-medium text-gray-700">Email</label>
                 <input type="email" name="email" value="<?= htmlspecialchars($email) ?>"
@@ -123,19 +112,17 @@ include __DIR__ . '/header.php';
                        required>
             </div>
 
-            <!-- Phone -->
             <div>
                 <label class="block text-sm font-medium text-gray-700">Phone</label>
                 <input type="text" name="phone" value="<?= htmlspecialchars($phone) ?>"
                        class="w-full px-4 py-2 border-b border-gray-300 outline-none focus:border-indigo-500 focus:ring-0 transition"
-                       placeholder="Contoh: 081234567890">
+                       placeholder="e.g. 081234567890">
             </div>
 
-            <!-- Tombol -->
             <div class="flex gap-3 pt-4">
                 <button type="submit"
                         class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
-                    Save Change
+                    Save Changes
                 </button>
                 <a href="profile.php"
                    class="px-6 py-2 bg-gray-400 text-white font-medium rounded-lg hover:bg-gray-500 transition">

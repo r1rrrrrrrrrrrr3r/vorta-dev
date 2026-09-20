@@ -152,7 +152,7 @@ include __DIR__ . '/header.php';
 
         <div class="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
           <p class="text-sm text-indigo-800 font-medium">
-            📌 <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target: 50–88 item.
+            <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target: 50–88 item.
           </p>
         </div>
       </div>
