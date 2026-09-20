@@ -1,19 +1,4 @@
-/* public/css/theme.css
- *
- * Two independent, instantly-switchable UI preferences:
- *
- *   <html data-theme="light|dark">        colour scheme
- *   <html data-nav="navbar|sidebar">      navigation layout
- *
- * Loaded AFTER the compiled Tailwind output.css. That build is a stale artefact
- * that does not contain dark: variants (or even every utility the pages use), so
- * dark mode is implemented by remapping the hardcoded colour utilities the app
- * already uses onto CSS variables. No Tailwind rebuild required.
- */
 
-/* ============================================================
-   Palette
-   ============================================================ */
 
 :root,
 [data-theme="light"] {
@@ -52,19 +37,6 @@
   --shadow-card: 0 1px 3px rgba(0,0,0,.4), 0 6px 18px -8px rgba(0,0,0,.6);
 }
 
-/* ============================================================
-   Base canvas
-   ------------------------------------------------------------
-   header.php puts class="bg-gray-50" on <body>, and the remap below turns
-   .bg-gray-50 into --surface-2 (a LIGHTER panel colour). Left alone, that made
-   the page body lighter than <html>, and because <body> is only as tall as its
-   content, the darker <html> colour showed through underneath — the "half the
-   page is a different colour / looks cut off" symptom.
-
-   So: pin the body canvas to --app-bg (with selectors specific enough to beat
-   the utility classes) and make it fill the viewport.
-   ============================================================ */
-
 html {
   min-height: 100%;
   background-color: var(--app-bg);
@@ -82,19 +54,21 @@ body.bg-white {
   transition: background-color .18s ease, color .18s ease;
 }
 
-/* ============================================================
-   Remap the hardcoded Tailwind utilities the pages already use
-   ============================================================ */
-
 .bg-white { background-color: var(--surface) !important; }
 .bg-gray-50 { background-color: var(--surface-2) !important; }
 .bg-gray-100 { background-color: var(--surface-3) !important; }
 .bg-gray-200 { background-color: var(--surface-3) !important; }
 
+.border-gray-100 { border-color: var(--border) !important; }
 .border-gray-200 { border-color: var(--border) !important; }
 .border-gray-300 { border-color: var(--border-strong) !important; }
+
+.divide-gray-100 > :not(:last-child),
+.divide-gray-200 > :not(:last-child),
 .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-.divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border) !important;
+}
 
 .text-gray-800, .text-gray-900, .text-black,
 .text-slate-700, .text-slate-800 { color: var(--text) !important; }
@@ -113,7 +87,6 @@ body.bg-white {
   box-shadow: var(--shadow-card) !important;
 }
 
-/* Form controls */
 input, select, textarea {
   background-color: var(--surface) !important;
   color: var(--text) !important;
@@ -125,7 +98,6 @@ input[disabled], select[disabled], textarea[disabled] {
   color: var(--text-faint) !important;
 }
 
-/* Status pills / alert boxes stay legible on a dark surface */
 [data-theme="dark"] .bg-green-100 { background-color: #14532d !important; }
 [data-theme="dark"] .text-green-800 { color: #bbf7d0 !important; }
 [data-theme="dark"] .bg-yellow-100 { background-color: #713f12 !important; }
@@ -145,7 +117,6 @@ input[disabled], select[disabled], textarea[disabled] {
 [data-theme="dark"] .border-green-200 { border-color: #166534 !important; }
 [data-theme="dark"] .border-red-200 { border-color: #991b1b !important; }
 
-/* Theme-aware scrollbars */
 * { scrollbar-color: var(--border-strong) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -154,10 +125,6 @@ input[disabled], select[disabled], textarea[disabled] {
   border-radius: 9999px;
   border: 2px solid var(--app-bg);
 }
-
-/* ============================================================
-   Navigation shell — shared by both layouts
-   ============================================================ */
 
 .vorta-shell {
   background: var(--surface);
@@ -208,8 +175,43 @@ input[disabled], select[disabled], textarea[disabled] {
 }
 .vorta-nav-link:hover { background: var(--surface-3); color: var(--brand); }
 .vorta-nav-link.is-active { background: var(--brand-soft); color: var(--brand-soft-text); font-weight: 600; }
-/* Icons are clamped here because output.css may not carry w-4/h-4. */
+
 .vorta-nav-link svg { width: 17px; height: 17px; flex: 0 0 17px; }
+
+.vorta-ui-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vorta-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.vorta-tool:hover {
+  background: var(--surface-3);
+  color: var(--brand);
+  border-color: var(--border-strong);
+}
+.vorta-tool svg { width: 17px; height: 17px; flex: 0 0 17px; display: none; }
+.vorta-tool-label { display: none; }
+
+[data-theme-pref="light"] .vorta-tool .icon-light { display: block; }
+[data-theme-pref="dark"] .vorta-tool .icon-dark { display: block; }
+[data-theme-pref="system"] .vorta-tool .icon-system { display: block; }
+[data-nav="navbar"] .vorta-tool .icon-navbar { display: block; }
+[data-nav="sidebar"] .vorta-tool .icon-sidebar { display: block; }
 
 .vorta-logout {
   display: flex; align-items: center; gap: 8px;
@@ -233,17 +235,12 @@ input[disabled], select[disabled], textarea[disabled] {
 .vorta-burger:hover { color: var(--brand); background: var(--surface-3); }
 .vorta-burger svg { width: 22px; height: 22px; display: block; }
 
-/* ============================================================
-   LAYOUT: navbar (default)  —  horizontal bar across the top
-   ============================================================ */
-
 [data-nav="navbar"] .vorta-shell {
   position: sticky;
   top: 0;
   z-index: 50;
 }
-/* A fixed bar height stops the logo/menu from sitting flush against the top
-   edge, which is what made the bar look clipped. */
+
 [data-nav="navbar"] .vorta-shell-inner {
   min-height: 64px;
 }
@@ -254,10 +251,6 @@ input[disabled], select[disabled], textarea[disabled] {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-
-/* ============================================================
-   LAYOUT: sidebar  —  fixed vertical rail on the left (wide screens)
-   ============================================================ */
 
 @media (min-width: 1025px) {
   [data-nav="sidebar"] body {
@@ -310,25 +303,33 @@ input[disabled], select[disabled], textarea[disabled] {
     padding: 10px 12px;
     font-size: 13.5px;
   }
-  /* Push logout to the bottom of the rail */
+
   [data-nav="sidebar"] .vorta-logout {
     margin-top: auto;
     justify-content: center;
   }
 
+  [data-nav="sidebar"] .vorta-ui-tools {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  [data-nav="sidebar"] .vorta-ui-tools + .vorta-logout { margin-top: 8px; }
+  [data-nav="sidebar"] .vorta-tool {
+    flex: 1 1 0;
+    width: auto;
+    height: 38px;
+    justify-content: flex-start;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  [data-nav="sidebar"] .vorta-tool-label { display: inline; }
+
   [data-theme="dark"][data-nav="sidebar"] .vorta-nav-link:hover { background: #1f2937; }
 
-  /* The in-bar burger belongs to the navbar layout only */
   [data-nav="sidebar"] .vorta-burger { display: none !important; }
 }
-
-/* ============================================================
-   Narrow screens  —  BOTH layouts become a collapsible top bar.
-   ------------------------------------------------------------
-   The sidebar used to slide off-canvas here, which could leave the page with no
-   visible navigation at all. Falling back to a top bar means navigation is
-   always reachable, and removes the backdrop/floating-button machinery.
-   ============================================================ */
 
 @media (max-width: 1024px) {
   [data-nav] body {
@@ -392,19 +393,26 @@ input[disabled], select[disabled], textarea[disabled] {
     margin-top: 6px;
   }
 
-  /* No longer used at this width */
+  [data-nav] .vorta-ui-tools {
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  [data-nav] .vorta-tool {
+    flex: 1 1 0;
+    width: auto;
+    height: 38px;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  [data-nav] .vorta-tool-label { display: inline; }
+
   [data-nav] .vorta-sidebar-toggle,
   [data-nav] .vorta-backdrop { display: none !important; }
 }
 
-/* The floating rail button and backdrop are retired; keep them inert so older
-   cached markup cannot leave a stray control or overlay on screen. */
 .vorta-sidebar-toggle,
 .vorta-backdrop { display: none !important; }
-
-/* ============================================================
-   Appearance controls (segmented switches in Account Settings)
-   ============================================================ */
 
 .pref-switch {
   display: flex;

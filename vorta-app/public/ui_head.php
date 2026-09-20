@@ -1,18 +1,5 @@
 <?php
-/**
- * public/ui_head.php
- *
- * Include inside <head>, AFTER the output.css link. Links the theme/layout stylesheet
- * and applies both preferences to <html> before first paint, so there is no flash of
- * the wrong theme or a navbar briefly appearing when sidebar is chosen.
- *
- * Preference resolution order: localStorage (instant, per device) -> the user's saved
- * database value -> default. Two attributes are set:
- *
- *   data-theme      light | dark   (resolved; 'system' follows the OS)
- *   data-theme-pref light | dark | system  (what the user actually picked)
- *   data-nav        navbar | sidebar
- */
+
 $uiTheme = $_SESSION['user']['theme'] ?? '';
 $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
 ?>
@@ -32,11 +19,11 @@ $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
       try { localStorage.setItem(key, value); } catch (e) {}
     }
 
-    var themePref = read('vorta-theme') || serverTheme || 'system';
+    var themePref = serverTheme || read('vorta-theme') || 'system';
     if (THEMES.indexOf(themePref) === -1) themePref = 'system';
 
-    var layout = read('vorta-nav') || serverLayout || 'navbar';
-    if (LAYOUTS.indexOf(layout) === -1) layout = 'navbar';
+    var layout = serverLayout || read('vorta-nav') || 'sidebar';
+    if (LAYOUTS.indexOf(layout) === -1) layout = 'sidebar';
 
     var mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
@@ -94,7 +81,7 @@ $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
         if (LAYOUTS.indexOf(value) === -1) return;
         root.setAttribute('data-nav', value);
         write('vorta-nav', value);
-        // Leaving sidebar mode must not strand the off-canvas "open" state.
+
         var shell = document.querySelector('.vorta-shell');
         if (shell) shell.classList.remove('is-open');
         var backdrop = document.querySelector('.vorta-backdrop');
@@ -104,7 +91,6 @@ $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
       }
     };
 
-    // Follow the OS live while the preference is 'system'.
     if (mql) {
       var onOsChange = function () {
         if (root.getAttribute('data-theme-pref') === 'system') {

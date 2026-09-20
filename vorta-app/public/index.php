@@ -14,9 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'name' => $user['name'],
       'email' => $user['email'],
       'role' => $user['role'],
-      // UI preferences, so ui_head.php can apply them before first paint.
+      
       'theme' => $user['theme'] ?? 'system',
-      'nav_layout' => $user['nav_layout'] ?? 'navbar'
+      'nav_layout' => $user['nav_layout'] ?? 'sidebar'
     ];
     header("Location: dashboard.php");
     exit;

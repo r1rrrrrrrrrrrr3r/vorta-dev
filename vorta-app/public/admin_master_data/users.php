@@ -35,27 +35,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
   }
 
   if (empty($name) || empty($email)) {
-    $_SESSION['error'] = "Nama dan Email wajib diisi.";
+    $_SESSION['error'] = "Name and email are required.";
   } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['error'] = "Format email tidak valid.";
+    $_SESSION['error'] = "Invalid email format.";
   } else {
     try {
       if ($action === 'create') {
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
         $check->execute([$email]);
         if ($check->fetch()) {
-          $_SESSION['error'] = "Email sudah digunakan.";
+          $_SESSION['error'] = "Email is already in use.";
         } else {
           $pass_hash = password_hash($password ?: 'password', PASSWORD_DEFAULT);
           $stmt = $pdo->prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)");
           $stmt->execute([$name, $email, $pass_hash, $role]);
-          $_SESSION['success'] = "User berhasil ditambahkan.";
+          $_SESSION['success'] = "User added successfully.";
         }
       } elseif ($action === 'update') {
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
         $check->execute([$email, $user_id]);
         if ($check->fetch()) {
-          $_SESSION['error'] = "Email sudah digunakan oleh user lain.";
+          $_SESSION['error'] = "Email is already in use by another user.";
         } else {
           $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ?");
           $stmt->execute([$name, $email, $role, $user_id]);
@@ -64,13 +64,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
             $pstmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ?");
             $pstmt->execute([$pass_hash, $user_id]);
           }
-          $_SESSION['success'] = "User berhasil diperbarui.";
+          $_SESSION['success'] = "User updated successfully.";
         }
       } else {
         $_SESSION['error'] = "Aksi tidak diketahui.";
       }
     } catch (PDOException $e) {
-      $_SESSION['error'] = "Gagal menyimpan data.";
+      $_SESSION['error'] = "Failed to save data.";
     }
   }
 
@@ -88,12 +88,12 @@ if (isset($_GET['delete_user'])) {
     $stmt->execute([$user_id]);
 
     if ($stmt->rowCount()) {
-      $_SESSION['success'] = "User berhasil dihapus.";
+      $_SESSION['success'] = "User deleted successfully.";
     } else {
-      $_SESSION['error'] = "User tidak ditemukan.";
+      $_SESSION['error'] = "User not found.";
     }
   } catch (PDOException $e) {
-    $_SESSION['error'] = "Gagal menghapus data.";
+    $_SESSION['error'] = "Failed to delete data.";
   }
 
   $params = ['tab' => 'users', 'page' => $page];
@@ -240,7 +240,7 @@ function page_url($p)
           <?php if (empty($users)): ?>
             <tr>
               <td colspan="5" class="py-6 text-center text-sm text-gray-400">
-                Tidak ada user ditemukan.
+                No users found.
               </td>
             </tr>
           <?php else: ?>
@@ -370,24 +370,24 @@ function page_url($p)
 
   document.getElementById('cancel-edit')?.addEventListener('click', function() {
     document.getElementById('user-form').reset();
-    document.getElementById('form-title').textContent = 'Tambah User Baru';
+    document.getElementById('form-title').textContent = 'Add New User';
     document.getElementById('action-input').value = 'create';
     document.getElementById('user-id-input').value = '';
     document.getElementById('user-role').value = 'staff';
-    document.getElementById('submit-btn').textContent = 'Tambah';
+    document.getElementById('submit-btn').textContent = 'Add';
     this.classList.add('hidden');
   });
 
   function confirmDelete(id, name) {
     Swal.fire({
-      title: 'Yakin hapus?',
-      text: `Anda akan menghapus user: "${name}"`,
+      title: 'Delete this record?',
+      text: `You are about to delete user: "${name}"`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Yes, delete it',
+      cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
         const url = new URL(window.location.href);

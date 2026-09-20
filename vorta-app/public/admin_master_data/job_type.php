@@ -20,20 +20,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     $job_type_id = (int)($_POST['job_type_id'] ?? 0);
 
     if (empty($name)) {
-        $_SESSION['error'] = "Nama Job Type wajib diisi.";
+        $_SESSION['error'] = "Job type name is required.";
     } else {
         try {
             if ($action === 'create') {
                 $stmt = $pdo->prepare("INSERT INTO job_type (name) VALUES (?)");
                 $stmt->execute([$name]);
-                $_SESSION['success'] = "Job Type berhasil ditambahkan.";
+                $_SESSION['success'] = "Job type added successfully.";
             } elseif ($action === 'update') {
                 $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ?");
                 $stmt->execute([$name, $job_type_id]);
                 if ($stmt->rowCount()) {
-                    $_SESSION['success'] = "Job Type berhasil diperbarui.";
+                    $_SESSION['success'] = "Job type updated successfully.";
                 } else {
-                    $_SESSION['error'] = "Job Type tidak ditemukan.";
+                    $_SESSION['error'] = "Job type not found.";
                 }
             }
 
@@ -45,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
         } catch (PDOException $e) {
             if ($e->getCode() == 23000) {
                 $_SESSION['error'] = $action === 'create' 
-                    ? "Job Type dengan nama ini sudah ada." 
-                    : "Nama Job Type sudah digunakan.";
+                    ? "A job type with this name already exists." 
+                    : "That job type name is already in use.";
             } else {
-                $_SESSION['error'] = "Gagal menyimpan data.";
+                $_SESSION['error'] = "Failed to save data.";
             }
         }
     }
@@ -61,12 +61,12 @@ if (isset($_GET['delete_job_type'])) {
         $stmt->execute([$job_type_id]);
 
         if ($stmt->rowCount()) {
-            $_SESSION['success'] = "Job Type berhasil dihapus.";
+            $_SESSION['success'] = "Job type deleted successfully.";
         } else {
-            $_SESSION['error'] = "Job Type tidak ditemukan.";
+            $_SESSION['error'] = "Job type not found.";
         }
     } catch (PDOException $e) {
-        $_SESSION['error'] = "Gagal menghapus data.";
+        $_SESSION['error'] = "Failed to delete data.";
     }
 
     $params = ['tab' => 'job_type', 'page' => $page];
@@ -175,7 +175,7 @@ function page_url($p) {
         <thead>
           <tr class="text-left border-b border-gray-200">
             <th class="pb-3 font-medium text-gray-600">ID</th>
-            <th class="pb-3 font-medium text-gray-600">Nama Job Type</th>
+            <th class="pb-3 font-medium text-gray-600">Job Type Name</th>
             <th class="pb-3 font-medium text-gray-600">Action</th>
           </tr>
         </thead>
@@ -183,7 +183,7 @@ function page_url($p) {
           <?php if (empty($job_types)): ?>
             <tr>
               <td colspan="3" class="py-6 text-center text-sm text-gray-400">
-                Tidak ada data Job Type ditemukan.
+                No job types found.
               </td>
             </tr>
           <?php else: ?>
@@ -299,7 +299,7 @@ function editJobType(id, name) {
 
 document.getElementById('cancel-edit')?.addEventListener('click', function () {
     document.querySelector('form').reset();
-    document.getElementById('form-title').textContent = 'Tambah Job Type Baru';
+    document.getElementById('form-title').textContent = 'Add New Job Type';
     document.getElementById('action-input').value = 'create';
     document.getElementById('job-type-id-input').value = '';
     this.classList.add('hidden');
@@ -307,14 +307,14 @@ document.getElementById('cancel-edit')?.addEventListener('click', function () {
 
 function confirmDelete(id, name) {
     Swal.fire({
-        title: 'Yakin hapus?',
-        text: `Anda akan menghapus Job Type: "${name}"`,
+        title: 'Delete this record?',
+        text: `You are about to delete job type: "${name}"`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Ya, hapus!',
-        cancelButtonText: 'Batal'
+        confirmButtonText: 'Yes, delete it',
+        cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
             const url = new URL(window.location.href);

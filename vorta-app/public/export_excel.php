@@ -10,9 +10,6 @@ $month = $_GET['month'] ?? date('Y-m');
 $notesFilter = $_GET['notes'] ?? '';
 $userFilter = $_GET['user_id'] ?? '';
 
-/**
- * Turn a filter value into a short, safe filename fragment.
- */
 function export_slug(string $value): string
 {
     $slug = preg_replace('/[^A-Za-z0-9]+/', '-', $value);
@@ -53,7 +50,6 @@ if ($recapType === 'daily') {
         ];
     }
 
-    // Filename reflects the filters actually applied, so separate exports stay distinguishable.
     $filename = 'attendance_daily_' . $date;
     if (!empty($notesFilter)) {
         $filename .= '_' . export_slug($notesFilter);
@@ -115,7 +111,7 @@ if ($recapType === 'monthly') {
 
     $filename = 'attendance_monthly_' . $month;
     if (!empty($userFilter)) {
-        // Label the file with the person's name rather than a bare id.
+
         $nameStmt = $pdo->prepare("SELECT name FROM users WHERE user_id = ?");
         $nameStmt->execute([$userFilter]);
         $who = $nameStmt->fetchColumn();

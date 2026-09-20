@@ -1,17 +1,11 @@
 <?php
 require_once __DIR__ . '/../lib/auth.php';
 
-/**
- * Navigation is defined ONCE here and rendered once. Whether it appears as a top
- * navbar or a left sidebar is decided purely by CSS via <html data-nav="...">,
- * which is why switching layouts is instant and needs no page reload — and why
- * there is no second, drifting copy of the menu for mobile.
- */
 $currentPage = basename($_SERVER['PHP_SELF']);
 
 $navItems = [];
 if (isset($_SESSION['user'])) {
-    // Inline SVG paths keep the nav dependency-free (no icon font needed).
+
     $icons = [
         'grid'     => 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z',
         'docs'     => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
@@ -62,8 +56,7 @@ if (isset($_SESSION['user'])) {
   <header class="vorta-shell" id="vortaShell">
     <div class="vorta-shell-inner">
       <a href="<?= isset($_SESSION['user']) ? 'dashboard.php' : 'index.php' ?>" class="vorta-brand">
-        <!-- Single source of truth: the project-root images/ folder, the one you edit.
-             Do NOT keep a second copy under public/images — it silently goes stale. -->
+
         <img src="../images/vorta.png" alt="Vorta logo">
         <span class="vorta-brand-text">
           <span class="vorta-brand-title">Vorta</span>
@@ -91,6 +84,23 @@ if (isset($_SESSION['user'])) {
             <?php endforeach; ?>
           </nav>
 
+          <div class="vorta-ui-tools">
+            <button type="button" class="vorta-tool" id="vortaThemeTool"
+              title="Switch theme" aria-label="Switch theme">
+              <svg class="icon-light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+              <svg class="icon-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+              <svg class="icon-system" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+              <span class="vorta-tool-label">Theme</span>
+            </button>
+
+            <button type="button" class="vorta-tool" id="vortaLayoutTool"
+              title="Switch navigation layout" aria-label="Switch navigation layout">
+              <svg class="icon-navbar" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16M4 9h16M6 13h12M6 17h12"></path></svg>
+              <svg class="icon-sidebar" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h5v14H4zM12 7h8M12 12h8M12 17h8"></path></svg>
+              <span class="vorta-tool-label">Layout</span>
+            </button>
+          </div>
+
           <a href="logout.php" class="vorta-logout">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -116,8 +126,6 @@ if (isset($_SESSION['user'])) {
         burgerIcon?.setAttribute('d', CLOSED);
       }
 
-      // On narrow screens both layouts collapse into this top bar, so one
-      // burger handles both cases.
       burger?.addEventListener('click', function () {
         shell.classList.toggle('is-open');
         burgerIcon?.setAttribute('d', shell.classList.contains('is-open') ? OPEN : CLOSED);
@@ -131,8 +139,34 @@ if (isset($_SESSION['user'])) {
         link.addEventListener('click', close);
       });
 
-      // Switching layout from Account Settings must not leave the menu expanded.
       document.addEventListener('vorta:uichange', close);
+
+      const themeTool = document.getElementById('vortaThemeTool');
+      const layoutTool = document.getElementById('vortaLayoutTool');
+      const THEME_ORDER = ['light', 'dark', 'system'];
+
+      themeTool?.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!window.VortaUI) return;
+        const current = window.VortaUI.getThemePreference();
+        const next = THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
+        window.VortaUI.setTheme(next);
+      });
+
+      layoutTool?.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!window.VortaUI) return;
+        window.VortaUI.setLayout(window.VortaUI.getLayout() === 'sidebar' ? 'navbar' : 'sidebar');
+      });
+
+      function syncTools() {
+        if (!window.VortaUI) return;
+        if (themeTool) themeTool.title = 'Theme: ' + window.VortaUI.getThemePreference() + ' (click to change)';
+        if (layoutTool) layoutTool.title = 'Layout: ' + window.VortaUI.getLayout() + ' (click to change)';
+      }
+
+      document.addEventListener('vorta:uichange', syncTools);
+      syncTools();
     })();
   </script>
 </body>

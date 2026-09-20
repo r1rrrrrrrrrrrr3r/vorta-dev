@@ -1,21 +1,5 @@
 <?php
-/**
- * lib/xlsx.php
- *
- * Minimal, dependency-free writer for REAL .xlsx (Office Open XML) files.
- *
- * Why this exists: the old export emitted an HTML <table> but named the download
- * ".xls". Excel opens that, but warns "The file format and extension don't match"
- * and other spreadsheet tools (LibreOffice, Google Sheets, Numbers) may refuse it.
- * This writes a genuine XLSX package so the extension matches the content.
- *
- * Uses only ZipArchive + DOM-free string building. Strings are written as
- * inline strings, which is valid OOXML and avoids a sharedStrings table.
- */
 
-/**
- * Convert a 0-based column index to an Excel column letter (0 => A, 26 => AA).
- */
 function xlsx_column_letter(int $index): string
 {
     $letters = '';
@@ -28,22 +12,14 @@ function xlsx_column_letter(int $index): string
     return $letters;
 }
 
-/**
- * Escape a value for XML text content, stripping characters XML 1.0 forbids.
- */
 function xlsx_escape($value): string
 {
     $text = (string) $value;
-    // Strip control characters that are illegal in XML 1.0 (except tab/LF/CR).
+
     $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $text);
     return htmlspecialchars($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
 }
 
-/**
- * True when the value should be written as a numeric cell rather than text.
- * Note: numeric-looking strings that must keep formatting (leading zeros, long
- * digit runs like phone numbers) are deliberately treated as TEXT.
- */
 function xlsx_is_number($value): bool
 {
     if (is_int($value) || is_float($value)) {
@@ -55,7 +31,7 @@ function xlsx_is_number($value): bool
     if (!preg_match('/^-?\d+(\.\d+)?$/', $value)) {
         return false;
     }
-    // Preserve leading zeros and long digit strings as text.
+
     if (strlen($value) > 1 && $value[0] === '0') {
         return false;
     }
@@ -65,17 +41,10 @@ function xlsx_is_number($value): bool
     return true;
 }
 
-/**
- * Build the worksheet XML for one sheet.
- *
- * @param string[]  $headers
- * @param array[]   $rows      list of row arrays (values in header order)
- */
 function xlsx_build_sheet(array $headers, array $rows): string
 {
     $colCount = max(count($headers), 1);
 
-    // Column widths sized from the header plus a sample of the data.
     $widths = [];
     foreach ($headers as $i => $h) {
         $widths[$i] = min(60, max(10, mb_strlen((string) $h) + 4));
@@ -90,7 +59,7 @@ function xlsx_build_sheet(array $headers, array $rows): string
             }
         }
         if (++$sampled >= 200) {
-            break; // enough to size columns; keeps large exports fast
+            break;
         }
     }
 
@@ -104,14 +73,12 @@ function xlsx_build_sheet(array $headers, array $rows): string
     }
     $xml .= '</cols>';
 
-    // Freeze the header row so long exports stay readable.
     $xml .= '<sheetViews><sheetView workbookViewId="0">';
     $xml .= '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>';
     $xml .= '</sheetView></sheetViews>';
 
     $xml .= '<sheetData>';
 
-    // Header row (style 1 = bold with fill)
     $xml .= '<row r="1">';
     foreach ($headers as $i => $header) {
         $ref = xlsx_column_letter($i) . '1';
@@ -126,7 +93,7 @@ function xlsx_build_sheet(array $headers, array $rows): string
         foreach (array_values($row) as $i => $value) {
             $ref = xlsx_column_letter($i) . $rowNum;
             if ($value === null || $value === '') {
-                continue; // omit empty cells entirely
+                continue;
             }
             if (xlsx_is_number($value)) {
                 $xml .= '<c r="' . $ref . '"><v>' . xlsx_escape($value) . '</v></c>';
@@ -141,20 +108,12 @@ function xlsx_build_sheet(array $headers, array $rows): string
     return $xml;
 }
 
-/**
- * Assemble the XLSX package and return its bytes.
- *
- * @param string[] $headers
- * @param array[]  $rows
- * @param string   $sheetName Visible worksheet name (sanitised).
- */
 function xlsx_build(array $headers, array $rows, string $sheetName = 'Sheet1'): string
 {
     if (!class_exists('ZipArchive')) {
         throw new RuntimeException('The PHP zip extension is required to build XLSX files.');
     }
 
-    // Excel sheet names: max 31 chars, and : \ / ? * [ ] are not allowed.
     $sheetName = preg_replace('/[:\\\\\\/?*\[\]]/', '-', $sheetName);
     $sheetName = trim(mb_substr($sheetName, 0, 31));
     if ($sheetName === '') {
@@ -187,7 +146,6 @@ function xlsx_build(array $headers, array $rows, string $sheetName = 'Sheet1'): 
         . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         . '</Relationships>';
 
-    // Two cell formats: 0 = default, 1 = bold on a light grey fill (header).
     $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         . '<fonts count="2">'
@@ -209,7 +167,6 @@ function xlsx_build(array $headers, array $rows, string $sheetName = 'Sheet1'): 
 
     $sheet = xlsx_build_sheet($headers, $rows);
 
-    // ZipArchive needs a real file to write into.
     $tmp = tempnam(sys_get_temp_dir(), 'vorta_xlsx_');
     if ($tmp === false) {
         throw new RuntimeException('Could not create a temporary file for the XLSX export.');
@@ -238,25 +195,17 @@ function xlsx_build(array $headers, array $rows, string $sheetName = 'Sheet1'): 
     return $bytes;
 }
 
-/**
- * Send an XLSX file to the browser as a download and stop the script.
- *
- * @param string   $filename Desired file name; a .xlsx extension is enforced.
- * @param string[] $headers
- * @param array[]  $rows
- */
 function xlsx_download(string $filename, array $headers, array $rows, string $sheetName = 'Sheet1'): void
 {
     $bytes = xlsx_build($headers, $rows, $sheetName);
 
-    // Keep the name filesystem-safe and guarantee the extension matches the bytes.
     $filename = preg_replace('/[^A-Za-z0-9._-]+/', '_', $filename);
     if (!preg_match('/\.xlsx$/i', $filename)) {
         $filename = preg_replace('/\.(xls|html?|csv)$/i', '', $filename) . '.xlsx';
     }
 
     if (ob_get_length()) {
-        ob_end_clean(); // drop any stray output so the file is not corrupted
+        ob_end_clean();
     }
 
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

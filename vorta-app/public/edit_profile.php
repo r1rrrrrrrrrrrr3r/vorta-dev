@@ -6,52 +6,26 @@ require_login();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
 
-// Separate feedback per card, so saving the profile does not show a message
-// inside the Security card (and vice versa).
 $profileError = '';
 $profileSuccess = '';
-$passwordError = '';
-$passwordSuccess = '';
-
-// Which section should be open after a POST.
-$activeSection = 'profile';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $formAction = $_POST['form_action'] ?? 'profile';
-
-    if ($formAction === 'password') {
-        $activeSection = 'security';
-        $result = account_change_password(
-            $pdo,
-            (int) $user_id,
-            $_POST['current_password'] ?? '',
-            $_POST['new_password'] ?? '',
-            $_POST['confirm_password'] ?? ''
-        );
-        if ($result['ok']) {
-            $passwordSuccess = $result['message'];
-        } else {
-            $passwordError = $result['message'];
-        }
+    $result = account_update_profile(
+        $pdo,
+        (int) $user_id,
+        $_POST['name'] ?? '',
+        $_POST['email'] ?? '',
+        $_POST['phone'] ?? ''
+    );
+    if ($result['ok']) {
+        $profileSuccess = $result['message'];
+        $_SESSION['user']['name'] = trim($_POST['name']);
+        $_SESSION['user']['email'] = trim($_POST['email']);
     } else {
-        $result = account_update_profile(
-            $pdo,
-            (int) $user_id,
-            $_POST['name'] ?? '',
-            $_POST['email'] ?? '',
-            $_POST['phone'] ?? ''
-        );
-        if ($result['ok']) {
-            $profileSuccess = $result['message'];
-            $_SESSION['user']['name'] = trim($_POST['name']);
-            $_SESSION['user']['email'] = trim($_POST['email']);
-        } else {
-            $profileError = $result['message'];
-        }
+        $profileError = $result['message'];
     }
 }
 
-// Always read back from the database so the form reflects what was actually stored.
 $stmt = $pdo->prepare("
     SELECT
         u.email,
@@ -89,8 +63,6 @@ include __DIR__ . '/header.php';
     <link rel="stylesheet" href="css/output.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
-        /* Sized in plain CSS because the compiled Tailwind build does not
-           necessarily contain every utility used on this page. */
         .acct-avatar {
             display: inline-flex;
             align-items: center;
@@ -114,29 +86,12 @@ include __DIR__ . '/header.php';
             letter-spacing: .02em;
             text-transform: capitalize;
         }
-        .pw-wrap { position: relative; }
-        .pw-wrap input { padding-right: 44px; }
-        .pw-toggle {
-            position: absolute;
-            top: 50%;
-            right: 10px;
-            transform: translateY(-50%);
-            border: 0;
-            background: transparent;
-            color: #6b7280;
-            cursor: pointer;
-            padding: 6px;
-            line-height: 1;
-        }
-        .pw-toggle:hover { color: #4f46e5; }
-        .pw-hint { font-size: 12px; margin-top: 6px; }
     </style>
 </head>
 
 <body>
     <div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
-        <!-- Page header: matches the card pattern used by profile.php -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="p-6 md:p-8">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -165,7 +120,6 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Profile information -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="p-6 md:p-8">
                 <h2 class="text-xl font-bold text-gray-800 mb-1">Profile Information</h2>
@@ -183,7 +137,6 @@ include __DIR__ . '/header.php';
                 <?php endif; ?>
 
                 <form method="POST" class="space-y-6">
-                    <input type="hidden" name="form_action" value="profile">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -230,7 +183,6 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Appearance: theme + navigation layout, applied instantly -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden" id="appearance">
             <div class="p-6 md:p-8">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
@@ -279,94 +231,28 @@ include __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- Security / change password -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden" id="security">
             <div class="p-6 md:p-8">
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800 mb-1">Security</h2>
                         <p class="text-sm text-gray-600">
-                            Change your password. You will need your current password to confirm.
+                            Change your password on its own page. Your current password is required to confirm.
                         </p>
                     </div>
-                    <button type="button" id="togglePasswordForm"
+                    <a href="change_password.php"
                         class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium whitespace-nowrap">
-                        <i class="fas fa-key"></i> Change Password
-                    </button>
+                        Change Password
+                    </a>
                 </div>
-
-                <?php if ($passwordError): ?>
-                    <div class="mt-6 p-4 bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg">
-                        <?= htmlspecialchars($passwordError) ?>
-                    </div>
-                <?php endif; ?>
-                <?php if ($passwordSuccess): ?>
-                    <div class="mt-6 p-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg">
-                        <?= htmlspecialchars($passwordSuccess) ?>
-                    </div>
-                <?php endif; ?>
-
-                <form method="POST" id="passwordForm" class="space-y-6 mt-6 <?= $activeSection === 'security' ? '' : 'hidden' ?>">
-                    <input type="hidden" name="form_action" value="password">
-
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Current Password</label>
-                        <div class="pw-wrap">
-                            <input type="password" name="current_password" id="current_password" required
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
-                            <button type="button" class="pw-toggle" data-target="current_password" aria-label="Show password">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
-                            <div class="pw-wrap">
-                                <input type="password" name="new_password" id="new_password" required
-                                    minlength="<?= ACCOUNT_MIN_PASSWORD_LENGTH ?>"
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
-                                <button type="button" class="pw-toggle" data-target="new_password" aria-label="Show password">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1">
-                                Minimum <?= ACCOUNT_MIN_PASSWORD_LENGTH ?> characters.
-                            </p>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
-                            <div class="pw-wrap">
-                                <input type="password" name="confirm_password" id="confirm_password" required
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
-                                <button type="button" class="pw-toggle" data-target="confirm_password" aria-label="Show password">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                            <p class="pw-hint text-gray-500" id="matchHint"></p>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3 pt-2 border-t border-gray-200 mt-2">
-                        <button type="submit" id="passwordSubmit"
-                            class="mt-4 px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
-                            Update Password
-                        </button>
-                        <button type="button" id="cancelPasswordForm"
-                            class="mt-4 px-6 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
             </div>
+        </div>
         </div>
 
     </div>
 
     <script>
-        // ---- Appearance switches (theme + navigation layout) ----
+
         (function () {
             if (!window.VortaUI) return;
 
@@ -409,75 +295,6 @@ include __DIR__ . '/header.php';
             sync();
         })();
 
-        (function () {
-            const form = document.getElementById('passwordForm');
-            const openBtn = document.getElementById('togglePasswordForm');
-            const cancelBtn = document.getElementById('cancelPasswordForm');
-
-            openBtn?.addEventListener('click', function () {
-                form.classList.toggle('hidden');
-                if (!form.classList.contains('hidden')) {
-                    document.getElementById('current_password')?.focus();
-                    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
-
-            cancelBtn?.addEventListener('click', function () {
-                form.reset();
-                form.classList.add('hidden');
-                setHint('');
-            });
-
-            // Arriving from the "Change Password" button on profile.php
-            // (edit_profile.php#security) should open the form, not just scroll to it.
-            if (window.location.hash === '#security' && form) {
-                form.classList.remove('hidden');
-                document.getElementById('security')?.scrollIntoView({ block: 'start' });
-            }
-
-            // Show / hide each password field individually.
-            document.querySelectorAll('.pw-toggle').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    const input = document.getElementById(btn.dataset.target);
-                    if (!input) return;
-                    const show = input.type === 'password';
-                    input.type = show ? 'text' : 'password';
-                    btn.innerHTML = show
-                        ? '<i class="fas fa-eye-slash"></i>'
-                        : '<i class="fas fa-eye"></i>';
-                    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-                });
-            });
-
-            // Live confirmation feedback, so the user is not told only after submitting.
-            const newPw = document.getElementById('new_password');
-            const confirmPw = document.getElementById('confirm_password');
-            const hint = document.getElementById('matchHint');
-            const submit = document.getElementById('passwordSubmit');
-
-            function setHint(text, ok) {
-                if (!hint) return;
-                hint.textContent = text;
-                hint.style.color = ok ? '#15803d' : '#b91c1c';
-            }
-
-            function checkMatch() {
-                if (!newPw || !confirmPw) return;
-                if (confirmPw.value === '') {
-                    setHint('');
-                    submit.disabled = false;
-                    return;
-                }
-                const ok = newPw.value === confirmPw.value;
-                setHint(ok ? 'Passwords match.' : 'Passwords do not match.', ok);
-                submit.disabled = !ok;
-                submit.style.opacity = ok ? '1' : '.6';
-                submit.style.cursor = ok ? 'pointer' : 'not-allowed';
-            }
-
-            newPw?.addEventListener('input', checkMatch);
-            confirmPw?.addEventListener('input', checkMatch);
-        })();
     </script>
 
     <?php include __DIR__ . '/footer.php'; ?>

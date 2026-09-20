@@ -21,20 +21,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
   $workforce_id = (int)($_POST['workforce_id'] ?? 0);
 
   if (empty($workforce_name)) {
-    $_SESSION['error'] = "Nama Work Force wajib diisi.";
+    $_SESSION['error'] = "Work force name is required.";
   } else {
     try {
       if ($action === 'create') {
         $stmt = $pdo->prepare("INSERT INTO work_force (workforce_name) VALUES (?)");
         $stmt->execute([$workforce_name]);
-        $_SESSION['success'] = "Work Force berhasil ditambahkan.";
+        $_SESSION['success'] = "Work force added successfully.";
       } elseif ($action === 'update') {
         $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ?");
         $stmt->execute([$workforce_name, $workforce_id]);
         if ($stmt->rowCount()) {
-          $_SESSION['success'] = "Work Force berhasil diperbarui.";
+          $_SESSION['success'] = "Work force updated successfully.";
         } else {
-          $_SESSION['error'] = "Work Force tidak ditemukan.";
+          $_SESSION['error'] = "Work force not found.";
         }
       }
 
@@ -46,10 +46,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
     } catch (PDOException $e) {
       if ($e->getCode() == 23000) {
         $_SESSION['error'] = $action === 'create'
-          ? "Work Force dengan nama ini sudah ada."
-          : "Nama Work Force sudah digunakan.";
+          ? "A work force with this name already exists."
+          : "That work force name is already in use.";
       } else {
-        $_SESSION['error'] = "Gagal menyimpan data.";
+        $_SESSION['error'] = "Failed to save data.";
       }
     }
   }
@@ -62,12 +62,12 @@ if (isset($_GET['delete_work_force'])) {
     $stmt->execute([$workforce_id]);
 
     if ($stmt->rowCount()) {
-      $_SESSION['success'] = "Work Force berhasil dihapus.";
+      $_SESSION['success'] = "Work force deleted successfully.";
     } else {
-      $_SESSION['error'] = "Work Force tidak ditemukan.";
+      $_SESSION['error'] = "Work force not found.";
     }
   } catch (PDOException $e) {
-    $_SESSION['error'] = "Gagal menghapus data.";
+    $_SESSION['error'] = "Failed to delete data.";
   }
 
   $params = ['tab' => 'work_force', 'page' => $page];
@@ -184,7 +184,7 @@ function page_url($p)
           <?php if (empty($workforces)): ?>
             <tr>
               <td colspan="3" class="py-6 text-center text-sm text-gray-400">
-                Tidak ada data Work Force ditemukan.
+                No work forces found.
               </td>
             </tr>
           <?php else: ?>
@@ -301,7 +301,7 @@ function page_url($p)
 
   document.getElementById('cancel-edit')?.addEventListener('click', function() {
     document.getElementById('workforce-form').reset();
-    document.getElementById('form-title').textContent = 'Tambah Work Force Baru';
+    document.getElementById('form-title').textContent = 'Add New Work Force';
     document.getElementById('action-input').value = 'create';
     document.getElementById('workforce-id-input').value = '';
     this.classList.add('hidden');
@@ -309,14 +309,14 @@ function page_url($p)
 
   function confirmDelete(id, name) {
     Swal.fire({
-      title: 'Yakin hapus?',
-      text: `Anda akan menghapus Work Force: "${name}"`,
+      title: 'Delete this record?',
+      text: `You are about to delete work force: "${name}"`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Yes, delete it',
+      cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
         const url = new URL(window.location.href);

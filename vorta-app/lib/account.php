@@ -1,22 +1,7 @@
 <?php
-/**
- * lib/account.php
- *
- * Shared account-management helpers.
- *
- * The password-change logic lives here so the inline Security section on
- * edit_profile.php and the standalone change_password.php page cannot drift
- * apart — both call the same function.
- */
 
-/** Minimum accepted password length. Keep in sync with the forms' minlength. */
 const ACCOUNT_MIN_PASSWORD_LENGTH = 6;
 
-/**
- * Verify the current password and set a new one.
- *
- * @return array{ok: bool, message: string}
- */
 function account_change_password(
     PDO $pdo,
     int $userId,
@@ -51,7 +36,7 @@ function account_change_password(
     if (!password_verify($current, $row['password_hash'])) {
         return ['ok' => false, 'message' => 'Current password is incorrect.'];
     }
-    // Rejecting a no-op change avoids a misleading "password changed" message.
+
     if (password_verify($new, $row['password_hash'])) {
         return ['ok' => false, 'message' => 'The new password must be different from the current one.'];
     }
@@ -62,14 +47,6 @@ function account_change_password(
     return ['ok' => true, 'message' => 'Password changed successfully.'];
 }
 
-/**
- * Update the signed-in user's profile fields (name, email, phone).
- *
- * Email lives on `users`; name and phone live on `employees`, which may not have
- * a row yet for this user, so it is created on demand.
- *
- * @return array{ok: bool, message: string}
- */
 function account_update_profile(
     PDO $pdo,
     int $userId,

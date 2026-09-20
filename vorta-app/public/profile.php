@@ -59,7 +59,7 @@ include __DIR__ . '/header.php';
                         <a href="edit_profile.php#appearance" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
                             Appearance
                         </a>
-                        <a href="edit_profile.php#security" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
+                        <a href="change_password.php" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
                             Change Password
                         </a>
                     </div>

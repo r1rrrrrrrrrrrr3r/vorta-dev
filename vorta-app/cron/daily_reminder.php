@@ -22,11 +22,11 @@ foreach ($rows as $r) {
   $c = (int)$r['c'];
   $msg = "
     <p>Halo {$name},</p>
-    <p>Hari ini Anda baru menginput <strong>{$c}</strong> pekerjaan.</p>
-    <p>Target harian minimal adalah <strong>2 item</strong>. Mohon lengkapi laporan harian sebelum 23:59.</p>
+    <p>You have submitted only <strong>{$c}</strong> report(s) today.</p>
+    <p>The daily minimum is <strong>2 items</strong>. Please complete your daily report before 23:59.</p>
     <p>-  Productivity Tracker</p>
   ";
-  send_simple_mail($email, "[Reminder] Lengkapi Laporan Harian", $msg);
+  send_simple_mail($email, "[Reminder] Complete Your Daily Report", $msg);
 }
 
 echo "Reminders sent: " . count($rows) . PHP_EOL;

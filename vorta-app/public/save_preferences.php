@@ -1,7 +1,5 @@
 <?php
-// public/save_preferences.php
-// Persists the signed-in user's UI preferences (theme and/or navigation layout).
-// Either field may be sent on its own, so the two controls save independently.
+
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/preferences.php';
@@ -20,7 +18,6 @@ if (!$result['ok']) {
     exit;
 }
 
-// Keep the session in step so the next page render bootstraps the same values.
 $_SESSION['user']['theme'] = $result['theme'];
 $_SESSION['user']['nav_layout'] = $result['nav_layout'];
 

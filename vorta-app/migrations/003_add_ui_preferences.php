@@ -1,7 +1,4 @@
 <?php
-// migrations/003_add_ui_preferences.php
-// Per-user UI preferences: colour theme and navigation layout.
-// Both are also mirrored in localStorage so the choice applies before first paint.
 
 return [
     'up' => function (PDO $pdo) {

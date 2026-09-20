@@ -422,7 +422,7 @@ include __DIR__ . '/header.php';
     document.body.style.overflow = 'auto';
   }
 
-  // Show the proof link in a SweetAlert instead of navigating away to a bare page.
+
   function showProofLink(url) {
     Swal.fire({
       title: 'Report Proof',
@@ -442,7 +442,7 @@ include __DIR__ . '/header.php';
     });
   }
 
-  // Escape user-supplied text before injecting it into the SweetAlert markup.
+
   function $escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
