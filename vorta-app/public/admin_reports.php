@@ -7,12 +7,10 @@ $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
 
-// === Pagination utk All Reports ===
 $limit = 5;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-// total data reports
 $countStmt = $pdo->prepare("
   SELECT COUNT(*) 
   FROM production_reports pr
@@ -24,14 +22,12 @@ $countStmt->execute([$start, $end]);
 $totalReports = (int)$countStmt->fetchColumn();
 $totalPages = ceil($totalReports / $limit);
 
-// Hitung startPage dan endPage untuk pagination
 $startPage = max(1, $page - 2);
 $endPage = min($totalPages, $startPage + 4);
 if ($endPage - $startPage < 4) {
   $startPage = max(1, $endPage - 4);
 }
 
-// ambil data reports sesuai halaman
 $stmt = $pdo->prepare("
   SELECT pr.*, u.name, wf.workforce_name
   FROM production_reports pr
@@ -44,13 +40,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([$start, $end]);
 $rows = $stmt->fetchAll();
 
-// === PERBAIKAN: Employees Less Than 2 Entries Today ===
 $today = date('Y-m-d');
-$shortLimit = 10; // Increased limit for better visibility
+$shortLimit = 10;
 $shortPage = isset($_GET['short_page']) ? max(1, (int)$_GET['short_page']) : 1;
 $shortOffset = ($shortPage - 1) * $shortLimit;
 
-// PERBAIKAN: Query yang lebih akurat untuk mengecek laporan hari ini
 $countShort = $pdo->prepare("
   SELECT COUNT(*) 
   FROM users u
@@ -67,14 +61,12 @@ $countShort->execute([$today]);
 $totalShort = (int)$countShort->fetchColumn();
 $totalShortPages = ceil($totalShort / $shortLimit);
 
-// Hitung startPage dan endPage untuk shortfall pagination
 $shortStartPage = max(1, $shortPage - 2);
 $shortEndPage = min($totalShortPages, $shortStartPage + 4);
 if ($shortEndPage - $shortStartPage < 4) {
   $shortStartPage = max(1, $shortEndPage - 4);
 }
 
-// PERBAIKAN: Ambil data dengan informasi yang lebih lengkap
 $short = $pdo->prepare("
   SELECT 
     u.user_id, 
@@ -96,7 +88,6 @@ $short = $pdo->prepare("
 $short->execute([$today]);
 $shortRows = $short->fetchAll();
 
-// PERBAIKAN: Hitung statistik untuk header
 $statsStmt = $pdo->prepare("
   SELECT 
     COUNT(*) as total_active_users,
@@ -131,7 +122,6 @@ include __DIR__ . '/header.php';
 
 <body>
   <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-    <!-- All Reports Card -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6 md:p-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -177,7 +167,7 @@ include __DIR__ . '/header.php';
                     <?php echo htmlspecialchars($r['workforce_name']) ?>
                   </td>
                   <td class="py-4 whitespace-nowrap">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-medium <?php echo $r['status'] === 'Selesai' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' ?>">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-medium <?php echo $r['status'] === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' ?>">
                       <?php echo htmlspecialchars($r['status']) ?>
                     </span>
                   </td>
@@ -197,14 +187,12 @@ include __DIR__ . '/header.php';
           </table>
         </div>
 
-        <!-- Pagination All Reports -->
         <?php if ($totalPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Page <?= $page ?> of <?= $totalPages ?>
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page Button -->
               <?php if ($page > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=1&short_page=<?= $shortPage ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -218,7 +206,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Previous Button -->
               <?php if ($page > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>&short_page=<?= $shortPage ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -232,7 +219,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Page Numbers -->
               <div class="hidden xs:flex gap-1">
                 <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                   <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $i ?>&short_page=<?= $shortPage ?>"
@@ -242,12 +228,10 @@ include __DIR__ . '/header.php';
                 <?php endfor; ?>
               </div>
 
-              <!-- Page indicator for mobile -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $page ?>
               </div>
 
-              <!-- Next Button -->
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>&short_page=<?= $shortPage ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -261,7 +245,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Last Page Button -->
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>&short_page=<?= $shortPage ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -280,11 +263,8 @@ include __DIR__ . '/header.php';
       </div>
     </div>
 
-    <!-- PERBAIKAN: Employees Less Than 2 Entries Today Card -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6 md:p-8">
-        <!-- Header dengan Statistik -->
-        <!-- Header dengan Statistik -->
         <div class="flex flex-col gap-4 mb-6">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="text-xl font-bold text-gray-800">
@@ -296,7 +276,6 @@ include __DIR__ . '/header.php';
             </button>
           </div>
 
-          <!-- Statistik dalam grid responsif -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div class="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
               <div class="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -329,8 +308,6 @@ include __DIR__ . '/header.php';
           </div>
         </div>
 
-
-
         <?php if (!$shortRows): ?>
           <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
             <div class="text-green-600 text-4xl mb-2"></div>
@@ -338,7 +315,6 @@ include __DIR__ . '/header.php';
             <p class="text-green-600 text-sm mt-1">Every active employee has submitted at least 2 reports today.</p>
           </div>
         <?php else: ?>
-          <!-- Progress Bar -->
           <div class="mb-6">
             <div class="flex justify-between text-sm text-gray-600 mb-1">
               <span>Completion Progress</span>
@@ -351,7 +327,6 @@ include __DIR__ . '/header.php';
             </div>
           </div>
 
-          <!-- Desktop: Table -->
           <div class="hidden md:block overflow-x-auto">
             <table class="w-full min-w-full">
               <thead>
@@ -410,7 +385,6 @@ include __DIR__ . '/header.php';
             </table>
           </div>
 
-          <!-- Mobile: Card Layout -->
           <div class="md:hidden space-y-4">
             <?php foreach ($shortRows as $s):
               $reportCount = (int)$s['report_count'];
@@ -458,14 +432,12 @@ include __DIR__ . '/header.php';
           </div>
         <?php endif; ?>
 
-        <!-- Pagination Shortfall -->
         <?php if ($totalShortPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Showing <?= count($shortRows) ?> of <?= $totalShort ?> employees - Page <?= $shortPage ?> of <?= $totalShortPages ?>
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page Button -->
               <?php if ($shortPage > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=1"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -479,7 +451,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Previous Button -->
               <?php if ($shortPage > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $shortPage - 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -493,7 +464,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Page Numbers -->
               <div class="hidden xs:flex gap-1">
                 <?php for ($i = $shortStartPage; $i <= $shortEndPage; $i++): ?>
                   <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $i ?>"
@@ -503,12 +473,10 @@ include __DIR__ . '/header.php';
                 <?php endfor; ?>
               </div>
 
-              <!-- Page indicator for mobile -->
               <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
                 <?= $shortPage ?>
               </div>
 
-              <!-- Next Button -->
               <?php if ($shortPage < $totalShortPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $shortPage + 1 ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -522,7 +490,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
 
-              <!-- Last Page Button -->
               <?php if ($shortPage < $totalShortPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $totalShortPages ?>"
                   class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
@@ -542,12 +509,11 @@ include __DIR__ . '/header.php';
     </div>
   </div>
 
-  <!-- Modal Popup -->
   <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-bold text-gray-800">Detail Laporan</h3>
+          <h3 class="text-xl font-bold text-gray-800">Report Detail</h3>
           <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">&times;</button>
         </div>
         <div id="modalContent"></div>
@@ -565,7 +531,7 @@ include __DIR__ . '/header.php';
       .then(data => {
         document.getElementById('modalContent').innerHTML = data;
         document.getElementById('reportModal').classList.remove('hidden');
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        document.body.style.overflow = 'hidden';
       });
   }
 

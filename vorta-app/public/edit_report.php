@@ -7,10 +7,9 @@ $user_id = $_SESSION['user']['user_id'];
 $report_id = $_GET['id'] ?? null;
 
 if (!$report_id) {
-    die("ID laporan tidak diberikan.");
+    die("Report ID not provided.");
 }
 
-// Ambil data laporan
 $stmt = $pdo->prepare("SELECT pr.*, wf.workforce_name 
                        FROM production_reports pr
                        LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
@@ -19,14 +18,13 @@ $stmt->execute([$report_id, $user_id]);
 $report = $stmt->fetch();
 
 if (!$report) {
-    die("Laporan tidak ditemukan atau Anda tidak memiliki akses.");
+    die("Report not found or you do not have access.");
 }
 
 if ($report['status'] !== 'Progress') {
-    die("Hanya laporan dengan status 'Progress' yang bisa diedit.");
+    die("Only reports with 'Progress' status can be edited.");
 }
 
-// Ambil daftar job type dan work force
 $job_types_stmt = $pdo->query("SELECT job_type_id, name FROM job_type ORDER BY name");
 $job_types = $job_types_stmt->fetchAll();
 
@@ -40,7 +38,7 @@ $workforces = $workforce_stmt->fetchAll();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vorta Prodtracker - Edit Laporan</title>
+    <title>Vorta Prodtracker - Edit Report</title>
     <link rel="stylesheet" href="css/output.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -56,7 +54,6 @@ $workforces = $workforce_stmt->fetchAll();
                 <form action="update_report.php" method="POST" enctype="multipart/form-data" class="space-y-6">
                     <input type="hidden" name="report_id" value="<?= $report['report_id'] ?>">
 
-                    <!-- Date & Job Type -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
@@ -79,18 +76,17 @@ $workforces = $workforce_stmt->fetchAll();
                                 <?php endforeach; ?>
                             </select>
                             <?php if (empty($job_types)): ?>
-                                <p class="text-red-500 text-sm mt-1">Belum ada job type yang terdaftar.</p>
+                                <p class="text-red-500 text-sm mt-1">No job types registered yet.</p>
                             <?php endif; ?>
                         </div>
                     </div>
 
-                    <!-- Title & Work Force -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Title/Menu/Layar</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Title/Menu/Screen</label>
                             <input type="text" name="title" value="<?= htmlspecialchars($report['title']) ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150"
-                                placeholder="Example: Login Page, Fitur Export PDF" required>
+                                placeholder="Example: Login Page, Export PDF Feature" required>
                         </div>
 
                         <div>
@@ -106,12 +102,11 @@ $workforces = $workforce_stmt->fetchAll();
                                 <?php endforeach; ?>
                             </select>
                             <?php if (empty($workforces)): ?>
-                                <p class="text-red-500 text-sm mt-1">Anda belum terdaftar di work force manapun.</p>
+                                <p class="text-red-500 text-sm mt-1">You are not registered under any work force yet.</p>
                             <?php endif; ?>
                         </div>
                     </div>
 
-                    <!-- Description -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
                         <textarea name="description" rows="4"
@@ -119,14 +114,13 @@ $workforces = $workforce_stmt->fetchAll();
                             placeholder="Describe task..."><?= htmlspecialchars($report['description'] ?? '') ?></textarea>
                     </div>
 
-                    <!-- Status & Proof Link -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                             <select name="status"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150">
                                 <option value="Progress" <?= $report['status'] === 'Progress' ? 'selected' : '' ?>>Progress</option>
-                                <option value="Selesai" <?= $report['status'] === 'Selesai' ? 'selected' : '' ?>>Selesai</option>
+                                <option value="Completed" <?= $report['status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
                             </select>
                         </div>
 
@@ -137,23 +131,21 @@ $workforces = $workforce_stmt->fetchAll();
                         </div>
                     </div>
 
-                    <!-- Proof Image Upload -->
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Proof (Foto)</label>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Proof (Photo)</label>
                         <?php if (!empty($report['proof_image'])): ?>
                             <div class="mb-3">
                                 <img src="../uploads/<?= htmlspecialchars($report['proof_image']) ?>" alt="Current Proof"
                                     class="max-w-xs h-auto rounded border shadow-sm">
-                                <p class="text-xs text-gray-500 mt-1">Gambar saat ini. Biarkan kosong untuk tetap menggunakan gambar ini.</p>
+                                <p class="text-xs text-gray-500 mt-1">Current image. Leave empty to keep using this image.</p>
                             </div>
                         <?php endif; ?>
                         <input type="file" name="proof_image" accept="image/*"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150"
                             onchange="validateFileSize(this)">
-                        <p class="text-xs text-gray-500 mt-1">Format: JPG, PNG, JPEG (maks. 1MB)</p>
+                        <p class="text-xs text-gray-500 mt-1">Format: JPG, PNG, JPEG (max. 1MB)</p>
                     </div>
 
-                    <!-- Submit Button -->
                     <div class="flex flex-col md:flex-row pt-2 gap-3 text-center">
                         <button type="submit" id="submitBtn"
                             class="w-full md:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base font-semibold rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200 ease-in-out transform hover:scale-105">
@@ -165,7 +157,6 @@ $workforces = $workforce_stmt->fetchAll();
                     </div>
                 </form>
 
-                <!-- Policy Note -->
                 <div class="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p class="text-sm text-indigo-800 font-medium">
                         📌 <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target: 50–88 item.
@@ -176,12 +167,11 @@ $workforces = $workforce_stmt->fetchAll();
     </div>
 
     <script>
-        // Validasi ukuran file (opsional)
         function validateFileSize(input) {
             if (input.files && input.files[0]) {
-                const maxSize = 1 * 1024 * 1024; // 1MB
+                const maxSize = 1 * 1024 * 1024;
                 if (input.files[0].size > maxSize) {
-                    Swal.fire('Error', 'Ukuran file terlalu besar. Maksimal 1MB.', 'error');
+                    Swal.fire('Error', 'File too large. Maximum 1MB.', 'error');
                     input.value = '';
                 }
             }

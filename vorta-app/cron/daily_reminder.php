@@ -25,7 +25,7 @@ foreach ($rows as $r) {
     <p>Halo {$name},</p>
     <p>Hari ini Anda baru menginput <strong>{$c}</strong> pekerjaan.</p>
     <p>Target harian minimal adalah <strong>2 item</strong>. Mohon lengkapi laporan harian sebelum 23:59.</p>
-    <p>- vorta Productivity Tracker</p>
+    <p>-  Productivity Tracker</p>
   ";
   send_simple_mail($email, "[Reminder] Lengkapi Laporan Harian", $msg);
 }

@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="w-full max-w-md">
     <div class="login-card bg-white rounded-xl p-8">
       <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">vorta Tracker</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Vorta Prodtracker</h1>
         <p class="text-gray-600">Productivity System Login</p>
       </div>
 

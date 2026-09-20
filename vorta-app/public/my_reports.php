@@ -11,13 +11,11 @@ $limit = 7;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-// Hitung total data untuk pagination
 $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
 $totalStmt->execute([$user_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $limit));
 
-// Ambil data dengan pagination
 $stmt = $pdo->prepare("SELECT 
         pr.*,
         wf.workforce_name
@@ -30,7 +28,6 @@ $stmt = $pdo->prepare("SELECT
 $stmt->execute([$user_id, $start, $end]);
 $rows = $stmt->fetchAll();
 
-// Data untuk chart (tidak dipaginasi — tetap semua data harian)
 $stmt2 = $pdo->prepare("SELECT DATE(report_date) d, COUNT(*) c 
                         FROM production_reports 
                         WHERE user_id = ? AND report_date BETWEEN ? AND ? 
@@ -59,7 +56,6 @@ include __DIR__ . '/header.php';
 
 <body>
   <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-    <!-- Summary Card -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6 md:p-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -93,7 +89,6 @@ include __DIR__ . '/header.php';
       </div>
     </div>
 
-    <!-- Reports Table -->
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6 md:p-8">
         <h2 class="text-xl font-bold text-gray-800 mb-6">Entry Details</h2>
@@ -129,7 +124,7 @@ include __DIR__ . '/header.php';
                   <td class="py-4 whitespace-nowrap">
                     <span
                       class="status-badge px-2.5 py-1 rounded-full text-xs font-medium 
-      <?php echo $r['status'] === 'Selesai' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>"
+      <?php echo $r['status'] === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>"
                       id="status-<?php echo $r['report_id']; ?>">
                       <?php echo htmlspecialchars($r['status']); ?>
                     </span>
@@ -139,7 +134,7 @@ include __DIR__ . '/header.php';
                     <?php if ($r['proof_link']): ?>
                       <a href="<?php echo htmlspecialchars($r['proof_link']) ?>" target="_blank"
                         class="text-indigo-600 hover:text-indigo-800 text-sm font-medium hover:underline transition">
-                        Lihat
+                        View
                       </a>
                     <?php elseif ($r['proof_image']): ?>
                       <button onclick="openModal(<?php echo $r['report_id'] ?>)"
@@ -159,7 +154,7 @@ include __DIR__ . '/header.php';
                         Mark Complete
                       </button>
                     <?php else: ?>
-                      <span class="text-gray-400 text-sm">Complete</span>
+                      <span class="text-gray-400 text-sm">Completed</span>
                     <?php endif; ?>
 
                     <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
@@ -170,7 +165,7 @@ include __DIR__ . '/header.php';
                     <button
                       onclick="deleteReport(<?php echo $r['report_id']; ?>, this)"
                       class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition"
-                      title="Hapus laporan">
+                      title="Delete report">
                       Delete
                     </button>
                   </td>
@@ -179,14 +174,12 @@ include __DIR__ . '/header.php';
             </tbody>
           </table>
         </div>
-        <!-- Pagination -->
         <?php if ($totalPages > 1): ?>
           <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-600 whitespace-nowrap">
               Showing <?= count($rows) ?> of <?= $total ?> records (Page <?= $page ?> of <?= $totalPages ?>)
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
-              <!-- First Page -->
               <?php if ($page > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=1"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -198,7 +191,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
   
-              <!-- Previous -->
               <?php if ($page > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -210,7 +202,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
   
-              <!-- Page Numbers -->
               <?php
               $startPage = max(1, $page - 2);
               $endPage = min($totalPages, $page + 2);
@@ -228,7 +219,6 @@ include __DIR__ . '/header.php';
                 <?php endif; ?>
               <?php endfor; ?>
   
-              <!-- Next -->
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -240,7 +230,6 @@ include __DIR__ . '/header.php';
                 </span>
               <?php endif; ?>
   
-              <!-- Last -->
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -264,7 +253,6 @@ include __DIR__ . '/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  // Chart.js
   const labels = <?php echo json_encode($labels); ?>;
   const data = <?php echo json_encode($data); ?>;
   new Chart(document.getElementById('chart'), {
@@ -272,7 +260,7 @@ include __DIR__ . '/header.php';
     data: {
       labels,
       datasets: [{
-        label: 'Item per Hari',
+        label: 'Items per Day',
         data,
         backgroundColor: 'rgba(79, 70, 229, 0.7)',
         borderColor: 'rgba(79, 70, 229, 1)',
@@ -298,15 +286,14 @@ include __DIR__ . '/header.php';
     }
   });
 
-  // Tandai selesai
   function markAsDone(reportId, btn) {
     Swal.fire({
-      title: 'Yakin?',
-      text: "Ingin menandai laporan ini sebagai selesai?",
+      title: 'Are you sure?',
+      text: "Mark this report as completed?",
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Ya, tandai!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Yes, mark it!',
+      cancelButtonText: 'Cancel'
     }).then((res) => {
       if (res.isConfirmed) {
         const originalText = btn.textContent;
@@ -326,21 +313,21 @@ include __DIR__ . '/header.php';
           .then(d => {
             if (d.success) {
               const statusEl = document.getElementById('status-' + reportId);
-              statusEl.textContent = 'Selesai';
+              statusEl.textContent = 'Completed';
               statusEl.className = 'status-badge px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800';
-              btn.textContent = 'Selesai';
+              btn.textContent = 'Completed';
               btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
               btn.classList.add('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
-              Swal.fire('Berhasil!', 'Status laporan diperbarui.', 'success');
+              Swal.fire('Success!', 'Report status updated.', 'success');
             } else {
-              Swal.fire('Gagal!', d.message, 'error');
+              Swal.fire('Failed!', d.message, 'error');
               btn.textContent = originalText;
               btn.disabled = false;
             }
           })
           .catch(e => {
             console.error(e);
-            Swal.fire('Error', 'Terjadi kesalahan koneksi.', 'error');
+            Swal.fire('Error', 'A connection error occurred.', 'error');
             btn.textContent = originalText;
             btn.disabled = false;
           });
@@ -348,22 +335,21 @@ include __DIR__ . '/header.php';
     });
   }
 
-  // Hapus laporan
   function deleteReport(reportId, btn) {
     Swal.fire({
-      title: 'Yakin hapus?',
-      text: "Laporan ini akan dihapus permanen!",
+      title: 'Are you sure?',
+      text: "This report will be permanently deleted!",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
     }).then((res) => {
       if (res.isConfirmed) {
         const row = document.getElementById('row-' + reportId);
         const originalText = btn.textContent;
-        btn.textContent = 'Menghapus...';
+        btn.textContent = 'Deleting...';
         btn.disabled = true;
 
         fetch('delete_report_ajax.php', {
@@ -381,17 +367,17 @@ include __DIR__ . '/header.php';
               row.classList.add('bg-red-50', 'animate-pulse');
               setTimeout(() => {
                 row.remove();
-                Swal.fire('Dihapus!', 'Laporan berhasil dihapus.', 'success');
+                Swal.fire('Deleted!', 'Report successfully deleted.', 'success');
               }, 300);
             } else {
-              Swal.fire('Gagal!', d.message, 'error');
+              Swal.fire('Failed!', d.message, 'error');
               btn.textContent = originalText;
               btn.disabled = false;
             }
           })
           .catch(e => {
             console.error(e);
-            Swal.fire('Error', 'Terjadi kesalahan koneksi.', 'error');
+            Swal.fire('Error', 'A connection error occurred.', 'error');
             btn.textContent = originalText;
             btn.disabled = false;
           });
@@ -400,12 +386,11 @@ include __DIR__ . '/header.php';
   }
 </script>
 
-<!-- Modal Popup -->
 <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
   <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
     <div class="p-6">
       <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-gray-800">Detail Laporan</h3>
+        <h3 class="text-xl font-bold text-gray-800">Report Detail</h3>
         <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">&times;</button>
       </div>
       <div id="modalContent"></div>
@@ -426,7 +411,7 @@ include __DIR__ . '/header.php';
       })
       .catch(err => {
         console.error(err);
-        document.getElementById('modalContent').innerHTML = '<p class="text-red-600">Terjadi kesalahan saat memuat data</p>';
+        document.getElementById('modalContent').innerHTML = '<p class="text-red-600">An error occurred while loading the data</p>';
       });
   }
 

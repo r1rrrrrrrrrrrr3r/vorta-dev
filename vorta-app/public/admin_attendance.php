@@ -181,7 +181,7 @@ include __DIR__ . '/header.php';
 
 <head>
   <meta charset="UTF-8">
-  <title>vorta Prodtracker - Attendance Recap</title>
+  <title>Vorta Prodtracker - Attendance Recap</title>
   <link rel="stylesheet" href="css/output.css">
 </head>
 
