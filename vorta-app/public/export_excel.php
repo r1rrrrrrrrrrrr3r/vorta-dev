@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/xlsx.php';
 require_admin();
 
 $recapType = $_GET['recap_type'] ?? 'daily';
@@ -8,6 +9,12 @@ $date = $_GET['date'] ?? date('Y-m-d');
 $month = $_GET['month'] ?? date('Y-m');
 $notesFilter = $_GET['notes'] ?? '';
 $userFilter = $_GET['user_id'] ?? '';
+
+function export_slug(string $value): string
+{
+    $slug = preg_replace('/[^A-Za-z0-9]+/', '-', $value);
+    return trim($slug, '-');
+}
 
 if ($recapType === 'daily') {
     $sql = "
@@ -27,27 +34,28 @@ if ($recapType === 'daily') {
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
-    $filename = "attendance_daily_{$date}.xls";
+    $headers = ['Name', 'Email', 'Check-in', 'Check-out', 'Status', 'Location', 'Notes', 'Explanation'];
 
-    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-    header("Content-Disposition: attachment; filename=\"{$filename}\"");
-
-    echo "<table border='1'>";
-    echo "<tr><th>Name</th><th>Email</th><th>Check-in</th><th>Check-out</th><th>Status</th><th>Location</th><th>Notes</th><th>Explanation</th></tr>";
+    $data = [];
     foreach ($rows as $r) {
-        echo "<tr>";
-        echo "<td>" . htmlspecialchars($r['name']) . "</td>";
-        echo "<td>" . htmlspecialchars($r['email']) . "</td>";
-        echo "<td>" . htmlspecialchars($r['check_in'] ?? '-') . "</td>";
-        echo "<td>" . htmlspecialchars($r['check_out'] ?? '-') . "</td>";
-        echo "<td>" . htmlspecialchars($r['status']) . "</td>";
-        echo "<td>" . htmlspecialchars($r['location'] ?? '-') . "</td>";
-        echo "<td>" . htmlspecialchars($r['notes'] ?? '-') . "</td>";
-        echo "<td>" . htmlspecialchars($r['explanation'] ?? '-') . "</td>";
-        echo "</tr>";
+        $data[] = [
+            $r['name'],
+            $r['email'],
+            $r['check_in'] ?? '-',
+            $r['check_out'] ?? '-',
+            $r['status'],
+            $r['location'] ?? '-',
+            $r['notes'] ?? '-',
+            $r['explanation'] ?? '-',
+        ];
     }
-    echo "</table>";
-    exit;
+
+    $filename = 'attendance_daily_' . $date;
+    if (!empty($notesFilter)) {
+        $filename .= '_' . export_slug($notesFilter);
+    }
+
+    xlsx_download($filename . '.xlsx', $headers, $data, 'Daily ' . $date);
 }
 
 if ($recapType === 'monthly') {
@@ -86,26 +94,33 @@ if ($recapType === 'monthly') {
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
-    $filename = "attendance_monthly_{$month}.xls";
+    $headers = ['Name', 'Present Morning', 'Present Afternoon', 'Present Invalid', 'Late', 'Leave', 'Sick'];
 
-    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-    header("Content-Disposition: attachment; filename=\"{$filename}\"");
-
-    echo "<table border='1'>";
-    echo "<tr><th>Name</th><th>Present Morning</th><th>Present Afternoon</th><th>Present Invalid</th><th>Late</th><th>Leave</th><th>Sick</th></tr>";
+    $data = [];
     foreach ($rows as $r) {
-        echo "<tr>";
-        echo "<td>" . htmlspecialchars($r['name']) . "</td>";
-        echo "<td>" . (int)$r['present_shift_morning'] . "</td>";
-        echo "<td>" . (int)$r['present_shift_afternoon'] . "</td>";
-        echo "<td>" . (int)$r['present_invalid'] . "</td>";
-        echo "<td>" . (int)$r['late'] . "</td>";
-        echo "<td>" . (int)$r['leave_count'] . "</td>";
-        echo "<td>" . (int)$r['sick'] . "</td>";
-        echo "</tr>";
+        $data[] = [
+            $r['name'],
+            (int) $r['present_shift_morning'],
+            (int) $r['present_shift_afternoon'],
+            (int) $r['present_invalid'],
+            (int) $r['late'],
+            (int) $r['leave_count'],
+            (int) $r['sick'],
+        ];
     }
-    echo "</table>";
-    exit;
+
+    $filename = 'attendance_monthly_' . $month;
+    if (!empty($userFilter)) {
+
+        $nameStmt = $pdo->prepare("SELECT name FROM users WHERE user_id = ?");
+        $nameStmt->execute([$userFilter]);
+        $who = $nameStmt->fetchColumn();
+        if ($who) {
+            $filename .= '_' . export_slug($who);
+        }
+    }
+
+    xlsx_download($filename . '.xlsx', $headers, $data, 'Monthly ' . $month);
 }
 
 http_response_code(400);

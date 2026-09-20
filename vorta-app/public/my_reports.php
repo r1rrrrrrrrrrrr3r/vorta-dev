@@ -132,10 +132,12 @@ include __DIR__ . '/header.php';
 
                   <td class="py-4 whitespace-nowrap">
                     <?php if ($r['proof_link']): ?>
-                      <a href="<?php echo htmlspecialchars($r['proof_link']) ?>" target="_blank"
+                      <button type="button"
+                        onclick="showProofLink(this.dataset.url)"
+                        data-url="<?php echo htmlspecialchars($r['proof_link'], ENT_QUOTES) ?>"
                         class="text-indigo-600 hover:text-indigo-800 text-sm font-medium hover:underline transition">
                         View
-                      </a>
+                      </button>
                     <?php elseif ($r['proof_image']): ?>
                       <button onclick="openModal(<?php echo $r['report_id'] ?>)"
                         class="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm transition">
@@ -418,6 +420,33 @@ include __DIR__ . '/header.php';
   function closeModal() {
     document.getElementById('reportModal').classList.add('hidden');
     document.body.style.overflow = 'auto';
+  }
+
+
+  function showProofLink(url) {
+    Swal.fire({
+      title: 'Report Proof',
+      html: '<p class="text-sm" style="margin-bottom:.5rem;">Proof link for this report:</p>'
+        + '<a href="' + encodeURI(url) + '" target="_blank" rel="noopener noreferrer"'
+        + ' style="color:#4f46e5;text-decoration:underline;word-break:break-all;">'
+        + $escapeHtml(url) + '</a>',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Open Link',
+      cancelButtonText: 'Close',
+      confirmButtonColor: '#4f46e5'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
+  }
+
+
+  function $escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 </script>
 

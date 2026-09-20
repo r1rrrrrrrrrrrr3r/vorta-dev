@@ -3,23 +3,23 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_admin();
 
-// Ambil tanggal dari input user, fallback ke hari ini
+
 $selected_date = $_GET['date'] ?? date('Y-m-d');
-// Validasi format tanggal
+
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected_date)) {
     $selected_date = date('Y-m-d');
 }
 
-// Konfigurasi pagination
+
 $limit = 10;
 $page = (int)($_GET['page'] ?? 1);
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Ambil user yang:
-// - bukan admin (dari tabel users)
-// - punya data di employees (untuk ambil position)
-// - belum absen pada tanggal terpilih
+
+
+
+
 $stmt = $pdo->prepare("
     SELECT 
         u.user_id,
@@ -40,7 +40,7 @@ $stmt->bindValue(3, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $users_not_checked_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Hitung total data untuk pagination
+
 $totalStmt = $pdo->prepare("
     SELECT COUNT(*)
     FROM users u
@@ -53,7 +53,7 @@ $totalStmt->execute([$selected_date]);
 $total_not_checked_in = $totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total_not_checked_in / $limit));
 
-// Hitung total karyawan (yang bukan admin dan ada di employees)
+
 $totalEmpStmt = $pdo->prepare("
     SELECT COUNT(*) 
     FROM users u
@@ -63,7 +63,7 @@ $totalEmpStmt = $pdo->prepare("
 $totalEmpStmt->execute();
 $total_employees = $totalEmpStmt->fetchColumn();
 
-// Hitung yang sudah absen pada tanggal terpilih (hanya yang bukan admin)
+
 $presentStmt = $pdo->prepare("
     SELECT COUNT(*) 
     FROM attendance a
@@ -124,7 +124,7 @@ include __DIR__ . '/header.php';
 
       <?php if (empty($users_not_checked_in)): ?>
         <div class="text-center py-6">
-          <p class="text-green-700 font-medium">All employees have checked in on <?= htmlspecialchars($selected_date) ?>. 🎉</p>
+          <p class="text-green-700 font-medium">All employees have checked in on <?= htmlspecialchars($selected_date) ?>.</p>
         </div>
       <?php else: ?>
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Employees Not Checked In</h2>
@@ -164,7 +164,7 @@ include __DIR__ . '/header.php';
             </div>
             <nav class="flex flex-wrap justify-center gap-1">
               <?php
-                // Fungsi bantu untuk membuat URL pagination dengan tanggal
+                
                 function getPaginationUrl($page, $date) {
                     return "?page=" . (int)$page . "&date=" . urlencode($date);
                 }

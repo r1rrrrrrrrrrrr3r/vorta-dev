@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   $user_id = (int)$user_id;
 
   if (empty($name) || $user_id <= 0) {
-    $_SESSION['error'] = "User dan nama wajib diisi.";
+    $_SESSION['error'] = "User and name are required.";
   } else {
     try {
       if ($action === 'create') {
@@ -62,11 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
         $check->execute([$user_id]);
         if ($check->fetch()) {
-          $_SESSION['error'] = "User ini sudah menjadi employee.";
+          $_SESSION['error'] = "This user is already an employee.";
         } else {
           $stmt = $pdo->prepare("INSERT INTO employees (user_id, name, position, phone) VALUES (?, ?, ?, ?)");
           $stmt->execute([$user_id, $name, $position, $phone]);
-          $_SESSION['success'] = "Employee berhasil ditambahkan.";
+          $_SESSION['success'] = "Employee added successfully.";
         }
       } elseif ($action === 'update') {
 
@@ -75,28 +75,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         $existing = $check->fetch();
 
         if (!$existing) {
-          $_SESSION['error'] = "Employee tidak ditemukan.";
+          $_SESSION['error'] = "Employee not found.";
         } else {
 
           if ($existing['user_id'] != $user_id) {
             $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
             $check_user->execute([$user_id]);
             if ($check_user->fetch()) {
-              $_SESSION['error'] = "User ini sudah menjadi employee lain.";
+              $_SESSION['error'] = "This user is already linked to another employee.";
             }
           }
 
           if (!isset($_SESSION['error'])) {
             $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ?");
             $stmt->execute([$name, $position, $phone, $employee_id]);
-            $_SESSION['success'] = "Employee berhasil diperbarui.";
+            $_SESSION['success'] = "Employee updated successfully.";
           }
         }
       } else {
-        $_SESSION['error'] = "Aksi tidak valid.";
+        $_SESSION['error'] = "Invalid action.";
       }
     } catch (PDOException $e) {
-      $_SESSION['error'] = "Gagal menyimpan data: " . $e->getMessage();
+      $_SESSION['error'] = "Failed to save data: " . $e->getMessage();
     }
   }
 
@@ -112,9 +112,9 @@ if (isset($_GET['delete_emp'])) {
   try {
     $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ?");
     $stmt->execute([$employee_id]);
-    $_SESSION['success'] = "Employee berhasil dihapus.";
+    $_SESSION['success'] = "Employee deleted successfully.";
   } catch (PDOException $e) {
-    $_SESSION['error'] = "Gagal menghapus: " . $e->getMessage();
+    $_SESSION['error'] = "Failed to delete: " . $e->getMessage();
   }
 
   $params = ['tab' => 'employees', 'page' => $page];
@@ -289,7 +289,7 @@ function page_url($p)
           <?php if (empty($employees)): ?>
             <tr>
               <td colspan="6" class="py-6 text-center text-sm text-gray-400">
-                Tidak ada employee ditemukan.
+                No employees found.
               </td>
             </tr>
           <?php else: ?>
@@ -419,7 +419,7 @@ function page_url($p)
 
   document.getElementById('cancel-emp')?.addEventListener('click', function() {
     document.querySelector('form').reset();
-    document.getElementById('emp-form-title').textContent = 'Tambah Employee';
+    document.getElementById('emp-form-title').textContent = 'Add Employee';
     document.getElementById('emp-action').value = 'create';
     document.getElementById('emp-id').value = '';
     document.getElementById('current-user-id').value = '';
@@ -428,14 +428,14 @@ function page_url($p)
 
   function confirmDeleteEmployee(employeeId, employeeName) {
     Swal.fire({
-      title: 'Yakin hapus?',
-      text: `Anda akan menghapus employee: ${employeeName}`,
+      title: 'Delete this record?',
+      text: `You are about to delete employee: ${employeeName}`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Yes, delete it',
+      cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
         window.location.href = `<?= page_url($page) ?>&delete_emp=${employeeId}`;

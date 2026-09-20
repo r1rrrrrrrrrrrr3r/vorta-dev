@@ -13,7 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'user_id' => $user['user_id'],
       'name' => $user['name'],
       'email' => $user['email'],
-      'role' => $user['role']
+      'role' => $user['role'],
+      
+      'theme' => $user['theme'] ?? 'system',
+      'nav_layout' => $user['nav_layout'] ?? 'sidebar'
     ];
     header("Location: dashboard.php");
     exit;
@@ -29,11 +32,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vorta Prodtracker - Login</title>
   <link rel="stylesheet" href="css/output.css">
+  <?php include __DIR__ . '/ui_head.php'; ?>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f8fafc;
     }
     .login-card {
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);

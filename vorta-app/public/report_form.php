@@ -128,7 +128,7 @@ include __DIR__ . '/header.php';
                 class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150">
               <button type="button" onclick="clearFileInput()"
                 class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
-                ✕
+                Clear
               </button>
             </div>
             <p class="text-xs text-gray-500 mt-1">Format: JPG, PNG, JPEG (max size equals server size)</p>
