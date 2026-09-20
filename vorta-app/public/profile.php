@@ -52,9 +52,17 @@ include __DIR__ . '/header.php';
             <div class="p-6 md:p-8">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <h1 class="text-2xl font-bold text-gray-800">My Profile</h1>
-                    <a href="edit_profile.php" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                        Edit Profile
-                    </a>
+                    <div class="flex flex-wrap gap-3">
+                        <a href="edit_profile.php" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                            Edit Profile
+                        </a>
+                        <a href="edit_profile.php#appearance" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
+                            Appearance
+                        </a>
+                        <a href="edit_profile.php#security" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
+                            Change Password
+                        </a>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

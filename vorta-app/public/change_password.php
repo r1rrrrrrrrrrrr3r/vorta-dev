@@ -1,36 +1,26 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/account.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
 $error = '';
 $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $current_password = trim($_POST['current_password']);
-    $new_password = trim($_POST['new_password']);
-    $confirm_password = trim($_POST['confirm_password']);
-    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-        $error = "Semua kolom harus diisi.";
-    } elseif ($new_password !== $confirm_password) {
-        $error = "Konfirmasi password tidak cocok.";
-    } elseif (strlen($new_password) < 6) {
-        $error = "Password baru minimal 6 karakter.";
+    // Same implementation the Security section of edit_profile.php uses,
+    // so the two pages can never validate differently.
+    $result = account_change_password(
+        $pdo,
+        (int) $user_id,
+        $_POST['current_password'] ?? '',
+        $_POST['new_password'] ?? '',
+        $_POST['confirm_password'] ?? ''
+    );
+    if ($result['ok']) {
+        $success = $result['message'];
     } else {
-        $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE user_id = ?");
-        $stmt->execute([$user_id]);
-        $user = $stmt->fetch();
-
-        if (!$user) {
-            $error = "Pengguna tidak ditemukan.";
-        } elseif (!password_verify($current_password, $user['password_hash'])) {
-            $error = "Password lama salah.";
-        } else {
-            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $update = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ?");
-            $update->execute([$hashed_password, $user_id]);
-            $success = "Password berhasil diubah!";
-        }
+        $error = $result['message'];
     }
 }
 ?>
@@ -47,14 +37,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 
-<body>
-    <main class="flex justify-center items-center h-screen mx-1">
-        <div class="w-auto sm:w-1/2 mx-auto bg-gray-50 rounded-lg shadow-lg p-6 mt-10">
-            <a href="profile.php"
-                class="text-black font-medium">
-                <i class="fas fa-arrow-left"></i>
-            </a>
-            <h2 class="text-2xl font-bold text-gray-800 my-6">Change Password</h2>
+<body class="bg-gray-50">
+    <main class="min-h-screen flex items-center justify-center px-4 py-10">
+        <div class="w-full max-w-lg bg-white rounded-xl shadow-lg border border-gray-200 p-6 md:p-8">
+            <div class="flex items-center gap-3 mb-6 border-b border-gray-200 pb-4">
+                <a href="profile.php" class="text-gray-500 hover:text-indigo-600 transition">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h2 class="text-2xl font-bold text-gray-800">Change Password</h2>
+            </div>
 
             <?php if ($error): ?>
                 <div class="mb-4 p-3 bg-red-100 text-red-800 text-sm rounded">
@@ -68,36 +59,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" class="space-y-5">
+            <form method="POST" class="space-y-6">
                 <div>
-                    <label for="current_password" class="block text-sm font-medium text-slate-700">Current Password</label>
+                    <label for="current_password" class="block text-sm font-semibold text-gray-700 mb-2">Current Password</label>
                     <input type="password" id="current_password" name="current_password" required
-                        class="w-full px-4 py-2 border-b-2 bg-transparent border-black outline-none focus:border-black focus:ring-0 rounded-none">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700">New Password</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
                     <input type="password" name="new_password" required minlength="6"
-                        class="w-full px-4 py-2 border-b-2 bg-transparent border-black outline-none focus:border-black focus:ring-0 rounded-none">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    <p class="text-xs text-gray-500 mt-1">Minimum 6 characters.</p>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700">Confirm New Password</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
                     <input type="password" name="confirm_password" required
-                        class="w-full px-4 py-2 border-b-2 bg-transparent border-black outline-none focus:border-black focus:ring-0 rounded-none">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
                 </div>
 
-                <div class="flex w-full pt-2">
+                <div class="flex gap-3 pt-2">
                     <button type="submit"
-                        class="px-4 sm:px-6 py-1 sm:py-2 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 
-                            text-white font-medium
-                                rounded-lg 
-                                hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 
-                                focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 
-                                transition-all duration-300 ease-in-out
-                                shadow-md hover:shadow-lg">
+                        class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
                         Update Password
                     </button>
+                    <a href="profile.php"
+                        class="px-6 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
+                        Cancel
+                    </a>
                 </div>
             </form>
         </div>
