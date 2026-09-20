@@ -1,6 +1,5 @@
 <?php
-// Run this via cron at 17:00 server time: 
-// 0 17 * * * /usr/bin/php /path/to/cron/daily_reminder.php
+
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/mailer.php';
 
