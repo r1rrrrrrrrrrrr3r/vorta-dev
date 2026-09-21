@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_admin();
 
+$dailyMin = settings_get_daily_min_reports($pdo);
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
@@ -44,7 +46,6 @@ $today = date('Y-m-d');
 $shortLimit = 10;
 $shortPage = isset($_GET['short_page']) ? max(1, (int)$_GET['short_page']) : 1;
 $shortOffset = ($shortPage - 1) * $shortLimit;
-
 $countShort = $pdo->prepare("
   SELECT COUNT(*) 
   FROM users u
@@ -54,9 +55,32 @@ $countShort = $pdo->prepare("
     FROM production_reports pr 
     WHERE pr.report_date = ? 
     GROUP BY pr.user_id 
-    HAVING COUNT(pr.report_id) >= 2
+    HAVING COUNT(pr.report_id) >= ?
   )
 ");
+$countShort->execute([$today, $dailyMin]);
+
+$short = $pdo->prepare("
+  SELECT 
+    u.user_id, 
+    u.name, 
+    u.email,
+    e.position,
+    COUNT(pr.report_id) as report_count,
+    GROUP_CONCAT(DISTINCT pr.job_type ORDER BY pr.report_id SEPARATOR ', ') as job_types,
+    GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') as report_titles
+  FROM users u
+  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
+  LEFT JOIN employees e ON e.user_id = u.user_id
+  WHERE u.is_active = 1
+  GROUP BY u.user_id
+  HAVING report_count < ?
+  ORDER BY report_count ASC, u.name
+  LIMIT $shortLimit OFFSET $shortOffset
+");
+$short->execute([$today, $dailyMin]);
+$short->execute([$today, $dailyMin]);
+$countShort->execute([$today, $dailyMin]);
 $countShort->execute([$today]);
 $totalShort = (int)$countShort->fetchColumn();
 $totalShortPages = ceil($totalShort / $shortLimit);
@@ -91,8 +115,8 @@ $shortRows = $short->fetchAll();
 $statsStmt = $pdo->prepare("
   SELECT 
     COUNT(*) as total_active_users,
-    SUM(CASE WHEN report_count >= 2 THEN 1 ELSE 0 END) as completed_users,
-    SUM(CASE WHEN report_count = 1 THEN 1 ELSE 0 END) as partial_users,
+    SUM(CASE WHEN report_count >= ? THEN 1 ELSE 0 END) as completed_users,
+    SUM(CASE WHEN report_count > 0 AND report_count < ? THEN 1 ELSE 0 END) as partial_users,
     SUM(CASE WHEN report_count = 0 THEN 1 ELSE 0 END) as zero_users
   FROM (
     SELECT 
@@ -104,6 +128,7 @@ $statsStmt = $pdo->prepare("
     GROUP BY u.user_id
   ) as user_reports
 ");
+$statsStmt->execute([$dailyMin, $dailyMin, $today]);
 $statsStmt->execute([$today]);
 $stats = $statsStmt->fetch();
 
@@ -341,7 +366,7 @@ include __DIR__ . '/header.php';
               <tbody class="divide-y divide-gray-100">
                 <?php foreach ($shortRows as $s):
                   $reportCount = (int)$s['report_count'];
-                  $statusText = $reportCount === 0 ? 'No Reports' : ($reportCount === 1 ? '1 Report' : 'Completed');
+                  $statusText = $reportCount >= $dailyMin ? 'Completed' : ($reportCount === 0 ? 'No Reports' : $reportCount . ' Report' . ($reportCount > 1 ? 's' : ''));
                 ?>
                   <tr class="hover:bg-gray-50 transition">
                     <td class="py-4">
@@ -373,10 +398,10 @@ include __DIR__ . '/header.php';
                       <?php endif; ?>
                     </td>
                     <td class="py-4 text-center">
-                      <span class="px-3 py-1 rounded-full text-xs font-medium
-                <?= $reportCount === 0 ? 'bg-red-100 text-red-800' : ($reportCount === 1 ? 'bg-yellow-100 text-yellow-800' :
+                      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold
+                <?= $reportCount === 0 ? 'bg-red-100 text-red-800' : ($reportCount < $dailyMin ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800') ?>">
-                        <?= $statusText ?>
+                        <?= $reportCount ?>
                       </span>
                     </td>
                   </tr>

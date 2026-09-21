@@ -12,6 +12,7 @@ $limit = 7;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 $monthlyTarget = settings_get_monthly_target($pdo);
+$dailyMin = settings_get_daily_min_reports($pdo);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
 $totalStmt->execute([$user_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
@@ -81,7 +82,7 @@ include __DIR__ . '/header.php';
         <div class="bg-indigo-50 p-4 rounded-lg mb-6">
           <p class="text-sm text-indigo-800">
             <span class="font-medium">Monthly Target:</span>
-            <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> items (minimum 2 items per day)
+            <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> items (minimum <?= $dailyMin ?> item<?= $dailyMin > 1 ? 's' : '' ?> per day)
           </p>
         </div>
 

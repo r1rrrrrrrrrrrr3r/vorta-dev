@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
     $result = settings_save($pdo, [
         'monthly_target_min' => $_POST['monthly_target_min'] ?? null,
         'monthly_target_max' => $_POST['monthly_target_max'] ?? null,
+        'daily_min_reports' => $_POST['daily_min_reports'] ?? null,
     ]);
 
     $_SESSION[$result['ok'] ? 'success' : 'error'] = $result['message'];
@@ -24,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
 }
 
 $target = settings_get_monthly_target($pdo);
+$dailyMin = settings_get_daily_min_reports($pdo);
 ?>
 
 <?php if ($success): ?>
@@ -44,18 +46,25 @@ $target = settings_get_monthly_target($pdo);
   <form method="POST" id="settings-form">
     <input type="hidden" name="entity" value="settings">
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Minimum</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Minimum</label>
         <input type="number" name="monthly_target_min" min="1" value="<?= (int) $target['min'] ?>"
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           placeholder="Example: 50" required>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Maximum</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Maximum</label>
         <input type="number" name="monthly_target_max" min="1" value="<?= (int) $target['max'] ?>"
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           placeholder="Example: 88" required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Daily Minimum</label>
+        <input type="number" name="daily_min_reports" min="1" value="<?= (int) $dailyMin ?>"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          placeholder="Example: 2" required>
+        <p class="text-xs text-gray-500 mt-1">Minimum reports required per staff per day.</p>
       </div>
     </div>
 
@@ -88,12 +97,20 @@ $target = settings_get_monthly_target($pdo);
               <?= (int) $target['min'] ?> items
             </td>
           </tr>
-          <tr class="hover:bg-gray-50 transition">
+                    <tr class="hover:bg-gray-50 transition">
             <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
               Monthly Target Maximum
             </td>
             <td class="py-4 whitespace-nowrap text-sm text-gray-600">
               <?= (int) $target['max'] ?> items
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-50 transition">
+            <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+              Daily Minimum
+            </td>
+            <td class="py-4 whitespace-nowrap text-sm text-gray-600">
+              <?= (int) $dailyMin ?> items/day
             </td>
           </tr>
         </tbody>

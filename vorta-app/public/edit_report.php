@@ -7,7 +7,7 @@ require_login();
 $user_id = $_SESSION['user']['user_id'];
 $report_id = $_GET['id'] ?? null;
 $monthlyTarget = settings_get_monthly_target($pdo);
-
+$dailyMin = settings_get_daily_min_reports($pdo);
 if (!$report_id) {
     die("Report ID not provided.");
 }
@@ -161,7 +161,7 @@ $workforces = $workforce_stmt->fetchAll();
 
                 <div class="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p class="text-sm text-indigo-800 font-medium">
-                        <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target:
+                        <strong>Policy:</strong> Minimum <?= $dailyMin ?> report<?= $dailyMin > 1 ? 's' : '' ?> per day. Monthly Target:
                         <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> item.
                     </p>
                 </div>

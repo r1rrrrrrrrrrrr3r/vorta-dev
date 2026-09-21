@@ -6,6 +6,7 @@ require_login();
 
 $user_id = $_SESSION['user']['user_id'];
 $monthlyTarget = settings_get_monthly_target($pdo);
+$dailyMin = settings_get_daily_min_reports($pdo);
 $stmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $employee = $stmt->fetch();
@@ -153,7 +154,7 @@ include __DIR__ . '/header.php';
 
         <div class="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
           <p class="text-sm text-indigo-800 font-medium">
-            <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target:
+            <strong>Policy:</strong> Minimum <?= $dailyMin ?> report<?= $dailyMin > 1 ? 's' : '' ?> per day. Monthly Target:
             <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> item.
           </p>
         </div>
