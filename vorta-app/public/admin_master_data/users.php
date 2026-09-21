@@ -118,7 +118,7 @@ $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalUsers = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalUsers / $perPage);
-$sql = "SELECT user_id, name, email, role FROM users $whereSql ORDER BY name ASC LIMIT ? OFFSET ?";
+$sql = "SELECT user_id, name, email, role FROM users $whereSql ORDER BY user_id ASC LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
 $index = 1;
 foreach ($params as $val) {

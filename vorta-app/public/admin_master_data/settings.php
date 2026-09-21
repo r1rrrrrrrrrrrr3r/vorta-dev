@@ -20,7 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
     ]);
 
     $_SESSION[$result['ok'] ? 'success' : 'error'] = $result['message'];
-    header("Location: admin_master_data.php?tab=settings");
+    $redirect = 'admin_master_data.php?tab=settings';
+    echo "<script> window.location.href = '$redirect'; </script>";
     exit;
 }
 
