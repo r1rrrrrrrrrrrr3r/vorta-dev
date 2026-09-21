@@ -24,7 +24,8 @@ if (!$report) {
 }
 
 if ($report['status'] !== 'Progress') {
-    die("Only reports with 'Progress' status can be edited.");
+    header("Location: my_reports.php");
+    exit;
 }
 
 $job_types_stmt = $pdo->query("SELECT job_type_id, name FROM job_type ORDER BY name");
@@ -32,6 +33,8 @@ $job_types = $job_types_stmt->fetchAll();
 
 $workforce_stmt = $pdo->query("SELECT workforce_id, workforce_name FROM work_force ORDER BY workforce_name");
 $workforces = $workforce_stmt->fetchAll();
+
+include __DIR__ . '/header.php';
 ?>
 
 <!DOCTYPE html>
@@ -54,12 +57,12 @@ $workforces = $workforce_stmt->fetchAll();
                 </h1>
 
                 <form action="update_report.php" method="POST" enctype="multipart/form-data" class="space-y-6">
-                    <input type="hidden" name="report_id" value="<?= $report['report_id'] ?>">
+                    <input type="hidden" name="report_id" value="<?= (int)$report['report_id'] ?>">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-                            <input type="date" name="report_date" value="<?= $report['report_date'] ?>"
+                            <input type="date" name="report_date" value="<?= htmlspecialchars($report['report_date']) ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150"
                                 required>
                         </div>
@@ -98,7 +101,7 @@ $workforces = $workforce_stmt->fetchAll();
                                 required>
                                 <option value="">-- Select Work Force --</option>
                                 <?php foreach ($workforces as $wf): ?>
-                                    <option value="<?= $wf['workforce_id'] ?>" <?= $wf['workforce_id'] == $report['workforce_id'] ? 'selected' : '' ?>>
+                                    <option value="<?= (int)$wf['workforce_id'] ?>" <?= $wf['workforce_id'] == $report['workforce_id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($wf['workforce_name']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -137,7 +140,7 @@ $workforces = $workforce_stmt->fetchAll();
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Proof (Photo)</label>
                         <?php if (!empty($report['proof_image'])): ?>
                             <div class="mb-3">
-                                <img src="../uploads/<?= htmlspecialchars($report['proof_image']) ?>" alt="Current Proof"
+                                <img src="../uploads/<?= htmlspecialchars(rawurlencode(basename($report['proof_image']))) ?>" alt="Current Proof"
                                     class="max-w-xs h-auto rounded border shadow-sm">
                                 <p class="text-xs text-gray-500 mt-1">Current image. Leave empty to keep using this image.</p>
                             </div>
@@ -180,6 +183,8 @@ $workforces = $workforce_stmt->fetchAll();
             }
         }
     </script>
+
+    <?php include __DIR__ . '/footer.php'; ?>
 </body>
 
 </html>

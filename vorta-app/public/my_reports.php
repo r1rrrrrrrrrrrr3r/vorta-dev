@@ -5,6 +5,157 @@ require_once __DIR__ . '/../lib/settings.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$detailOwnerId = (int)$user_id;
+
+$detailSelf = basename(__FILE__);
+
+function report_detail_e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+
+function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
+{
+    $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
+            FROM production_reports pr
+            LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
+            JOIN users u ON u.user_id = pr.user_id
+            WHERE pr.report_id = ?";
+    $params = [$reportId];
+    if ($ownerId !== null) {
+        $sql .= " AND pr.user_id = ?";
+        $params[] = $ownerId;
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $found = $stmt->fetch();
+    return $found ?: null;
+}
+
+if (isset($_GET['proof_image'])) {
+    $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
+    $file = $row ? basename((string)$row['proof_image']) : '';
+    $path = __DIR__ . '/../uploads/' . $file;
+    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
+    if (!$mime || strpos($mime, 'image/') !== 0) {
+        http_response_code(404);
+        exit;
+    }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($path));
+    header('Cache-Control: private, max-age=3600');
+    readfile($path);
+    exit;
+}
+
+if (isset($_GET['detail'])) {
+    $row = report_detail_fetch($pdo, (int)$_GET['detail'], $detailOwnerId);
+    if (!$row) {
+        http_response_code(404);
+        echo '<p class="text-red-600">Report not found or access denied.</p>';
+        exit;
+    }
+
+    $status = $row['status'] ?? 'Progress';
+    $statusClass = $status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+    $timestamp = strtotime((string) $row['report_date']);
+    $dateLabel = $timestamp ? date('d M Y', $timestamp) : '-';
+    $description = trim((string) ($row['description'] ?? ''));
+    $rawLink = trim((string) ($row['proof_link'] ?? ''));
+    $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
+    $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
+    $hasImage = $imageFile !== '';
+    $imageExists = $hasImage && is_file(__DIR__ . '/../uploads/' . $imageFile);
+    $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
+
+    $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';
+    $label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:4px;';
+    $value = 'font-size:14px;font-weight:600;color:var(--text);word-break:break-word;';
+    $section = 'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;';
+    ?>
+<div style="display:flex;flex-direction:column;gap:18px;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+    <h4 style="font-size:18px;font-weight:700;line-height:1.3;color:var(--text);word-break:break-word;"><?= report_detail_e($row['title']) ?></h4>
+    <span class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap <?= $statusClass ?>"><?= report_detail_e($status) ?></span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+    <div style="<?= $card ?>">
+      <div style="<?= $label ?>">Date</div>
+      <div style="<?= $value ?>"><?= report_detail_e($dateLabel) ?></div>
+    </div>
+    <div style="<?= $card ?>">
+      <div style="<?= $label ?>">Submitted By</div>
+      <div style="<?= $value ?>"><?= report_detail_e($row['user_name']) ?></div>
+    </div>
+    <div style="<?= $card ?>">
+      <div style="<?= $label ?>">Job Type</div>
+      <div style="<?= $value ?>"><?= report_detail_e($row['job_type'] ?? '-') ?></div>
+    </div>
+    <div style="<?= $card ?>">
+      <div style="<?= $label ?>">Work Force</div>
+      <div style="<?= $value ?>"><?= report_detail_e($row['workforce_name'] ?? '-') ?></div>
+    </div>
+  </div>
+
+  <div>
+    <div style="<?= $section ?>">Description</div>
+    <div style="<?= $card ?>font-size:14px;line-height:1.6;color:var(--text);word-break:break-word;">
+      <?php if ($description !== ''): ?>
+        <?= nl2br(report_detail_e($description)) ?>
+      <?php else: ?>
+        <span style="color:var(--text-faint);font-style:italic;">No description provided.</span>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div>
+    <div style="<?= $section ?>">Proof</div>
+    <?php if ($rawLink === '' && !$hasImage): ?>
+      <div style="<?= $card ?>font-size:14px;color:var(--text-faint);font-style:italic;">No proof attached.</div>
+    <?php else: ?>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <?php if ($rawLink !== ''): ?>
+          <div style="<?= $card ?>display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="min-width:0;flex:1;">
+              <div style="<?= $label ?>">Link</div>
+              <?php if ($isHttp): ?>
+                <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
+                  style="font-size:14px;color:var(--brand);text-decoration:underline;word-break:break-all;"><?= report_detail_e($rawLink) ?></a>
+              <?php else: ?>
+                <span style="font-size:14px;color:var(--text);word-break:break-all;"><?= report_detail_e($rawLink) ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if ($isHttp): ?>
+              <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
+                class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition whitespace-nowrap">Open</a>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($hasImage): ?>
+          <div style="<?= $card ?>">
+            <div style="<?= $label ?>margin-bottom:8px;">Photo</div>
+            <?php if ($imageExists): ?>
+              <a href="<?= report_detail_e($imageUrl) ?>" target="_blank" rel="noopener noreferrer">
+                <img src="<?= report_detail_e($imageUrl) ?>" alt="Proof photo" loading="lazy"
+                  onerror="this.parentNode.style.display='none';this.parentNode.nextElementSibling.style.display='block';"
+                  style="display:block;max-width:100%;max-height:300px;margin:0 auto;border-radius:10px;object-fit:contain;">
+              </a>
+              <div style="display:none;font-size:14px;color:var(--text-faint);font-style:italic;">The photo could not be loaded.</div>
+            <?php else: ?>
+              <div style="font-size:14px;color:var(--text-faint);font-style:italic;">The photo file could not be found on the server.</div>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php
+    exit;
+}
+
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
@@ -110,7 +261,10 @@ include __DIR__ . '/header.php';
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              <?php foreach ($rows as $r): ?>
+              <?php foreach ($rows as $r):
+                $hasLink = trim((string)($r['proof_link'] ?? '')) !== '';
+                $hasImage = trim((string)($r['proof_image'] ?? '')) !== '';
+              ?>
                 <tr class="hover:bg-gray-50 transition" id="row-<?php echo $r['report_id']; ?>">
                   <td class="py-4 whitespace-nowrap text-sm text-gray-600">
                     <?php echo htmlspecialchars($r['report_date']) ?>
@@ -118,8 +272,11 @@ include __DIR__ . '/header.php';
                   <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
                     <?php echo htmlspecialchars($r['job_type']) ?>
                   </td>
-                  <td class="py-4 whitespace-nowrap text-sm text-gray-800">
-                    <?php echo htmlspecialchars($r['title']) ?>
+                  <td class="py-4 whitespace-nowrap text-sm">
+                    <button type="button" onclick="openModal(<?php echo (int)$r['report_id']; ?>)"
+                      class="text-left text-gray-800 hover:text-indigo-600 hover:underline transition" style="cursor:pointer;" title="View report detail">
+                      <?php echo htmlspecialchars($r['title']) ?>
+                    </button>
                   </td>
                   <td class="py-4 whitespace-nowrap text-[10px] sm:text-sm font-medium text-gray-800">
                     <?php echo htmlspecialchars($r['workforce_name'] ?? '-'); ?>
@@ -134,17 +291,13 @@ include __DIR__ . '/header.php';
                   </td>
 
                   <td class="py-4 whitespace-nowrap">
-                    <?php if ($r['proof_link']): ?>
+                    <?php if ($hasLink || $hasImage): ?>
                       <button type="button"
-                        onclick="showProofLink(this.dataset.url)"
-                        data-url="<?php echo htmlspecialchars($r['proof_link'], ENT_QUOTES) ?>"
-                        class="text-indigo-600 hover:text-indigo-800 text-sm font-medium hover:underline transition">
+                        onclick="showProof(this)"
+                        data-link="<?php echo htmlspecialchars(trim((string)($r['proof_link'] ?? '')), ENT_QUOTES) ?>"
+                        data-image="<?php echo $hasImage ? 'my_reports.php?proof_image=' . (int)$r['report_id'] : '' ?>"
+                        class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-sm transition">
                         View
-                      </button>
-                    <?php elseif ($r['proof_image']): ?>
-                      <button onclick="openModal(<?php echo $r['report_id'] ?>)"
-                        class="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm transition">
-                        See Picture
                       </button>
                     <?php else: ?>
                       <span class="text-gray-400 text-sm">-</span>
@@ -158,14 +311,15 @@ include __DIR__ . '/header.php';
                         class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition">
                         Mark Complete
                       </button>
+
+                      <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
+                        id="edit-<?php echo $r['report_id']; ?>"
+                        class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
+                        Edit
+                      </a>
                     <?php else: ?>
                       <span class="text-gray-400 text-sm">Completed</span>
                     <?php endif; ?>
-
-                    <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
-                      class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
-                      Edit
-                    </a>
 
                     <button
                       onclick="deleteReport(<?php echo $r['report_id']; ?>, this)"
@@ -195,7 +349,7 @@ include __DIR__ . '/header.php';
                   &laquo; First
                 </span>
               <?php endif; ?>
-  
+
               <?php if ($page > 1): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -206,11 +360,11 @@ include __DIR__ . '/header.php';
                   &lsaquo; Prev
                 </span>
               <?php endif; ?>
-  
+
               <?php
               $startPage = max(1, $page - 2);
               $endPage = min($totalPages, $page + 2);
-  
+
               for ($i = $startPage; $i <= $endPage; $i++): ?>
                 <?php if ($i == $page): ?>
                   <span class="px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded-lg text-sm font-medium">
@@ -223,7 +377,7 @@ include __DIR__ . '/header.php';
                   </a>
                 <?php endif; ?>
               <?php endfor; ?>
-  
+
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -234,7 +388,7 @@ include __DIR__ . '/header.php';
                   Next &rsaquo;
                 </span>
               <?php endif; ?>
-  
+
               <?php if ($page < $totalPages): ?>
                 <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>"
                   class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
@@ -323,6 +477,8 @@ include __DIR__ . '/header.php';
               btn.textContent = 'Completed';
               btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
               btn.classList.add('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
+              const editLink = document.getElementById('edit-' + reportId);
+              if (editLink) editLink.remove();
               Swal.fire('Success!', 'Report status updated.', 'success');
             } else {
               Swal.fire('Failed!', d.message, 'error');
@@ -391,31 +547,40 @@ include __DIR__ . '/header.php';
   }
 </script>
 
-<div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-    <div class="p-6">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-gray-800">Report Detail</h3>
-          <button onclick="closeModal()" aria-label="Close"
-            class="flex items-center justify-center w-9 h-9 rounded-full text-2xl leading-none text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
-            &times;
-          </button>
+<div id="reportModal" class="fixed inset-0 hidden z-50" style="background: rgba(15, 23, 42, 0.55);">
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white overflow-hidden"
+    style="width: calc(100% - 2rem); max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed);">
+      <div>
+        <p style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .8;">Production Report</p>
+        <h3 style="font-size: 17px; font-weight: 700; line-height: 1.2;">Report Detail</h3>
       </div>
-      <div id="modalContent"></div>
+      <button onclick="closeModal()" aria-label="Close"
+        style="width: 32px; height: 32px; border-radius: 9999px; background: rgba(255, 255, 255, .18); color: #fff; font-size: 20px; line-height: 1; cursor: pointer;">
+        &times;
+      </button>
+    </div>
+    <div id="modalContent" style="padding: 20px; overflow-y: auto;"></div>
+    <div style="padding: 12px 20px; text-align: right; border-top: 1px solid var(--border);">
+      <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium transition">
+        Close
+      </button>
     </div>
   </div>
 </div>
 
 <script>
   function openModal(reportId) {
-    fetch(`get_report_detail_user.php?id=${reportId}`, {
+    document.getElementById('modalContent').innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
+    document.getElementById('reportModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    fetch('my_reports.php?detail=' + encodeURIComponent(reportId), {
         credentials: 'same-origin'
       })
       .then(r => r.text())
       .then(d => {
         document.getElementById('modalContent').innerHTML = d;
-        document.getElementById('reportModal').classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
       })
       .catch(err => {
         console.error(err);
@@ -428,31 +593,80 @@ include __DIR__ . '/header.php';
     document.body.style.overflow = 'auto';
   }
 
+  document.getElementById('reportModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
 
-  function showProofLink(url) {
-    Swal.fire({
-      title: 'Report Proof',
-      html: '<p class="text-sm" style="margin-bottom:.5rem;">Proof link for this report:</p>'
-        + '<a href="' + encodeURI(url) + '" target="_blank" rel="noopener noreferrer"'
-        + ' style="color:#4f46e5;text-decoration:underline;word-break:break-all;">'
-        + $escapeHtml(url) + '</a>',
-      icon: 'info',
-      showCancelButton: true,
-      confirmButtonText: 'Open Link',
-      cancelButtonText: 'Close',
-      confirmButtonColor: '#4f46e5'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      }
-    });
-  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
 
-
-  function $escapeHtml(text) {
+  function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function swalTheme() {
+    const dark = window.VortaUI && window.VortaUI.getTheme() === 'dark';
+    return dark ? {
+      background: '#1e293b',
+      color: '#e2e8f0'
+    } : {
+      background: '#ffffff',
+      color: '#1f2937'
+    };
+  }
+
+  function showProof(btn) {
+    const link = (btn.dataset.link || '').trim();
+    const image = btn.dataset.image || '';
+    const isHttp = /^https?:\/\//i.test(link);
+    const label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px;';
+
+    let html = '<div style="display:flex;flex-direction:column;gap:16px;text-align:left;">';
+
+    if (image) {
+      html += `<div>
+        <div style="${label}">Photo</div>
+        <a href="${escapeAttr(image)}" target="_blank" rel="noopener noreferrer">
+          <img src="${escapeAttr(image)}" alt="Proof photo" onerror="this.style.display='none'"
+            style="display:block;max-width:100%;max-height:320px;margin:0 auto;border-radius:12px;object-fit:contain;border:1px solid rgba(148,163,184,.35);">
+        </a>
+      </div>`;
+    }
+
+    if (link) {
+      const linkHtml = isHttp ?
+        `<a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" style="color:#6366f1;text-decoration:underline;">${escapeHtml(link)}</a>` :
+        escapeHtml(link);
+      html += `<div>
+        <div style="${label}">Link</div>
+        <div style="border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:10px 14px;font-size:14px;word-break:break-all;">${linkHtml}</div>
+      </div>`;
+    }
+
+    html += '</div>';
+
+    Swal.fire(Object.assign({
+      title: 'Report Proof',
+      html: html,
+      width: 560,
+      showCloseButton: true,
+      showConfirmButton: isHttp,
+      confirmButtonText: 'Open Link',
+      confirmButtonColor: '#4f46e5',
+      showCancelButton: true,
+      cancelButtonText: 'Close'
+    }, swalTheme())).then((result) => {
+      if (result.isConfirmed && isHttp) {
+        window.open(link, '_blank', 'noopener,noreferrer');
+      }
+    });
   }
 </script>
 
