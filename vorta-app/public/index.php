@@ -14,7 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'name' => $user['name'],
       'email' => $user['email'],
       'role' => $user['role'],
-      
       'theme' => $user['theme'] ?? 'system',
       'nav_layout' => $user['nav_layout'] ?? 'sidebar'
     ];
@@ -37,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body {
       font-family: 'Inter', sans-serif;
+      padding-left: 0 !important;
     }
     .login-card {
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
