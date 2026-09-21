@@ -33,7 +33,7 @@ $types->execute([$start, $end]);
 $typeRows = $types->fetchAll();
 $typeTotal = array_sum(array_column($typeRows, 'c'));
 
-$limit = 5; 
+$limit = 5;
 $page  = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
@@ -47,6 +47,21 @@ if ($endPage - $startPage < 4) {
 }
 
 $pieColors = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#14b8a6', '#eab308'];
+
+$maxSlices = 6;
+$chartRows = array_slice($typeRows, 0, $maxSlices);
+if (count($typeRows) > $maxSlices) {
+    $rest = array_slice($typeRows, $maxSlices);
+    $chartRows[] = [
+        'job_type' => 'Others',
+        'c'        => array_sum(array_column($rest, 'c')),
+        'detail'   => implode(', ', array_column($rest, 'job_type')),
+    ];
+}
+foreach ($chartRows as $i => &$row) {
+    $row['color'] = isset($row['detail']) ? '#94a3b8' : $pieColors[$i % count($pieColors)];
+}
+unset($row);
 
 $serverThemePref = $_SESSION['user']['theme'] ?? 'system';
 if (!in_array($serverThemePref, ['light', 'dark', 'system'], true)) {
@@ -66,60 +81,66 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
     @media (prefers-color-scheme: dark){
       html[data-theme-pref="system"]{background:#0f172a}
     }
+    body{background-color:transparent}
+
     .progress-bar { height: 8px; border-radius: 4px; }
     .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
     .stat-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 18px;
-      border-radius: 14px;
+      display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 14px;
       background: var(--surface, #fff);
       box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,.06), 0 6px 18px -8px rgba(0,0,0,.12));
     }
-    .stat-icon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      flex: 0 0 44px;
-      border-radius: 12px;
-    }
+    .stat-icon { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; }
     .stat-icon svg { width: 22px; height: 22px; }
     .stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
     .stat-label { font-size: 12.5px; color: var(--text-muted, #6b7280); margin-top: 2px; }
-    .donut-wrap { position: relative; }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      background: var(--surface-3, #f3f4f6); color: var(--text-muted, #6b7280); flex: 0 0 22px;
+    }
+
+    .chart-card { display: flex; flex-direction: column; }
+    .chart-inner { display: flex; flex-direction: column; flex: 1; padding: 24px; }
+    .chart-layout {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 20px 28px;
+      margin: auto 0;
+      padding: 12px 0;
+    }
+    .donut-wrap { position: relative; width: 168px; height: 168px; flex: 0 0 168px; }
     .donut-center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      pointer-events: none;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      text-align: center; pointer-events: none;
     }
     .donut-center .num { font-size: 24px; font-weight: 700; color: var(--text, #1f2937); line-height: 1; }
     .donut-center .lbl { font-size: 11px; color: var(--text-muted, #6b7280); margin-top: 2px; }
-    .legend-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
-    .legend-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 10px; }
-    .legend-name { flex: 1; font-size: 13px; color: var(--text, #1f2937); }
-    .legend-count { font-size: 12.5px; font-weight: 600; color: var(--text-muted, #6b7280); }
-    .rank-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      background: var(--surface-3, #f3f4f6);
-      color: var(--text-muted, #6b7280);
-      flex: 0 0 22px;
+
+    .legend-list { flex: 1 1 190px; min-width: 0; max-width: 100%; }
+    .legend-row {
+      display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+      align-items: center; column-gap: 10px; padding: 7px 0;
+    }
+    .legend-row + .legend-row { border-top: 1px solid var(--border, #e5e7eb); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 999px; }
+    .legend-name {
+      font-size: 13px; color: var(--text, #1f2937);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .legend-count { font-size: 12.5px; font-weight: 600; color: var(--text, #1f2937); white-space: nowrap; }
+    .legend-pct { font-weight: 500; color: var(--text-faint, #9ca3af); margin-left: 4px; }
+
+    .chart-empty {
+      flex: 1; min-height: 160px; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text-faint, #9ca3af);
+    }
+    .chart-note {
+      margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border, #e5e7eb);
+      font-size: 13px; color: var(--text-muted, #6b7280);
     }
   </style>
   <link rel="stylesheet" href="css/output.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <?php include_once __DIR__ . '/ui_head.php'; ?>
 </head>
 <body class="bg-gray-50">
 <?php include __DIR__ . '/header.php'; ?>
@@ -297,49 +318,56 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
       </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-3">Job Type Distribution</h2>
-        <?php if (empty($typeRows)): ?>
-          <div class="h-56 flex items-center justify-center text-sm text-gray-400">
-            No reports for this month yet.
-          </div>
+    <div class="bg-white rounded-xl shadow-md overflow-hidden chart-card">
+      <div class="chart-inner">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Job Type Distribution</h2>
+
+        <?php if (empty($chartRows)): ?>
+          <div class="chart-empty">No reports for this month yet.</div>
         <?php else: ?>
-          <div class="donut-wrap h-48">
-            <canvas id="pie"></canvas>
-            <div class="donut-center">
-              <div class="num"><?= (int) $typeTotal ?></div>
-              <div class="lbl">reports</div>
+          <div class="chart-layout">
+            <div class="donut-wrap">
+              <canvas id="pie"></canvas>
+              <div class="donut-center">
+                <div class="num"><?= (int) $typeTotal ?></div>
+                <div class="lbl">reports</div>
+              </div>
+            </div>
+
+            <div class="legend-list">
+              <?php foreach ($chartRows as $t):
+                $pctType = $typeTotal > 0 ? round(($t['c'] / $typeTotal) * 100) : 0;
+              ?>
+                <div class="legend-row" title="<?= htmlspecialchars($t['detail'] ?? $t['job_type']) ?>">
+                  <span class="legend-dot" style="background: <?= $t['color'] ?>"></span>
+                  <span class="legend-name"><?= htmlspecialchars($t['job_type']) ?></span>
+                  <span class="legend-count"><?= (int) $t['c'] ?><span class="legend-pct"><?= $pctType ?>%</span></span>
+                </div>
+              <?php endforeach; ?>
             </div>
           </div>
-          <div class="mt-4 pt-4 border-t border-gray-100">
-            <?php foreach ($typeRows as $i => $t):
-              $pctType = $typeTotal > 0 ? round(($t['c'] / $typeTotal) * 100) : 0;
-              $color = $pieColors[$i % count($pieColors)];
-            ?>
-              <div class="legend-row">
-                <span class="legend-dot" style="background: <?= $color ?>"></span>
-                <span class="legend-name truncate"><?= htmlspecialchars($t['job_type']) ?></span>
-                <span class="legend-count"><?= (int) $t['c'] ?> (<?= $pctType ?>%)</span>
-              </div>
-            <?php endforeach; ?>
-          </div>
         <?php endif; ?>
-        <p class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
+
+        <p class="chart-note">
           Rule: Minimum <?= $dailyMin ?> item<?= $dailyMin > 1 ? 's' : '' ?> per day per staff.
         </p>
       </div>
     </div>
-  </div> 
-</div> 
+  </div>
+</div>
 
 <script>
-  const pieLabels = <?php echo json_encode(array_column($typeRows, 'job_type')); ?>;
-  const pieData = <?php echo json_encode(array_map('intval', array_column($typeRows, 'c'))); ?>;
-  const pieColors = <?php echo json_encode($pieColors); ?>;
+  const pieLabels  = <?= json_encode(array_column($chartRows, 'job_type')) ?>;
+  const pieData    = <?= json_encode(array_map('intval', array_column($chartRows, 'c'))) ?>;
+  const pieColors  = <?= json_encode(array_column($chartRows, 'color')) ?>;
+  const pieDetails = <?= json_encode(array_map(fn($r) => $r['detail'] ?? '', $chartRows)) ?>;
+
+  function surfaceColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#ffffff';
+  }
 
   if (pieData.length > 0) {
-    new Chart(document.getElementById('pie'), {
+    const pieChart = new Chart(document.getElementById('pie'), {
       type: 'doughnut',
       data: {
         labels: pieLabels,
@@ -347,7 +375,7 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
           data: pieData,
           backgroundColor: pieColors,
           borderWidth: 2,
-          borderColor: '#ffffff',
+          borderColor: surfaceColor(),
           hoverOffset: 4
         }]
       },
@@ -356,9 +384,19 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
         maintainAspectRatio: false,
         cutout: '70%',
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (ctx) => pieDetails[ctx.dataIndex] || ''
+            }
+          }
         }
       }
+    });
+
+    document.addEventListener('vorta:uichange', function () {
+      pieChart.data.datasets[0].borderColor = surfaceColor();
+      pieChart.update('none');
     });
   }
 </script>

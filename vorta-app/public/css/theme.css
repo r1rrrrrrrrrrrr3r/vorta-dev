@@ -119,6 +119,22 @@ input[disabled], select[disabled], textarea[disabled] {
 [data-theme="dark"] .bg-gray-300 { background-color: var(--surface-3) !important; }
 [data-theme="dark"] .bg-gray-400 { background-color: var(--border-strong) !important; }
 
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.62);
+  opacity: 1;
+  cursor: pointer;
+}
+
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.85);
+}
+
 * { scrollbar-color: var(--border-strong) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
