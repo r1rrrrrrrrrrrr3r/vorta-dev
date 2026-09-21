@@ -2,6 +2,11 @@
 require_once __DIR__ . '/../lib/auth.php';
 
 $currentPage = basename($_SERVER['PHP_SELF']);
+$serverThemePref = $_SESSION['user']['theme'] ?? 'system';
+if (!in_array($serverThemePref, ['light', 'dark', 'system'], true)) {
+    $serverThemePref = 'system';
+}
+$serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
 
 $navItems = [];
 if (isset($_SESSION['user'])) {
@@ -33,12 +38,19 @@ if (isset($_SESSION['user'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="scroll-smooth" data-theme-pref="<?= htmlspecialchars($serverThemePref) ?>" data-theme="<?= htmlspecialchars($serverResolvedTheme) ?>">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vorta Productivity Tracker</title>
+  <style>
+    html{background:#f3f4f6}
+    html[data-theme="dark"]{background:#0f172a}
+    @media (prefers-color-scheme: dark){
+      html[data-theme-pref="system"]{background:#0f172a}
+    }
+  </style>
   <link rel="stylesheet" href="css/output.css">
   <?php include __DIR__ . '/ui_head.php'; ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

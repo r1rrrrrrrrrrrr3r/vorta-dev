@@ -36,18 +36,30 @@ if ($endPage - $startPage < 4) {
     $startPage = max(1, $endPage - 4);
 }
 ?>
+<?php
+$__serverThemePref = $_SESSION['user']['theme'] ?? 'system';
+if (!in_array($__serverThemePref, ['light', 'dark', 'system'], true)) {
+    $__serverThemePref = 'system';
+}
+$__serverResolvedTheme = $__serverThemePref === 'dark' ? 'dark' : 'light';
+?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-pref="<?= htmlspecialchars($__serverThemePref) ?>" data-theme="<?= htmlspecialchars($__serverResolvedTheme) ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vorta Production Dashboard</title>
+  <style>
+    html{background:#f3f4f6}
+    html[data-theme="dark"]{background:#0f172a}
+    @media (prefers-color-scheme: dark){
+      html[data-theme-pref="system"]{background:#0f172a}
+    }
+    .progress-bar { height: 8px; border-radius: 4px; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  </style>
   <link rel="stylesheet" href="css/output.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-      .progress-bar { height: 8px; border-radius: 4px; }
-      .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
-  </style>
 </head>
 <body class="bg-gray-50">
 <?php include __DIR__ . '/header.php'; ?>
