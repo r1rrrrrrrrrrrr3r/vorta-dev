@@ -1,10 +1,12 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_login();
 
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
+$target = settings_get_monthly_target($pdo);
 $end = date('Y-m-t', strtotime($start));
 $stmt = $pdo->prepare("
   SELECT u.user_id, u.name, u.role,
@@ -81,8 +83,8 @@ if ($endPage - $startPage < 4) {
             </thead>
             <tbody class="divide-y divide-gray-100">
               <?php foreach ($usersPage as $u):
-                $pct = $u['total'] >= 88 ? 100 : round(($u['total'] / 88) * 100);
-                $colorClass = $u['total'] >= 50 ? 'bg-green-500' : ($u['total'] >= 30 ? 'bg-yellow-500' : 'bg-red-500');
+                $pct = $u['total'] >= $target['max'] ? 100 : round(($u['total'] / $target['max']) * 100);
+                $colorClass = $u['total'] >= $target['min'] ? 'bg-green-500' : ($u['total'] >= ($target['min'] * 0.6) ? 'bg-yellow-500' : 'bg-red-500');
               ?>
               <tr class="hover:bg-gray-50 transition">
                 <td class="py-4">

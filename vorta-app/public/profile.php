@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -14,7 +15,8 @@ $stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?")
 $stmt->execute([$user_id, $today]);
 $attendance = $stmt->fetch();
 
-$target = 88;
+$targetRange = settings_get_monthly_target($pdo);
+$target = $targetRange['max'];
 $monthStart = date('Y-m-01');
 $monthEnd = date('Y-m-t');
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");

@@ -1,10 +1,11 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
-
+$monthlyTarget = settings_get_monthly_target($pdo);
 $stmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $employee = $stmt->fetch();
@@ -152,7 +153,8 @@ include __DIR__ . '/header.php';
 
         <div class="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
           <p class="text-sm text-indigo-800 font-medium">
-            <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target: 50–88 item.
+            <strong>Policy:</strong> Minimum 2 reports per day. Monthly Target:
+            <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> item.
           </p>
         </div>
       </div>
