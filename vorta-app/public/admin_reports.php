@@ -78,7 +78,7 @@ $short = $pdo->prepare("
     GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') as report_titles
   FROM users u
   LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-  JOIN employees e ON e.user_id = u.user_id
+  LEFT JOIN employees e ON e.user_id = u.user_id
   WHERE u.is_active = 1
   GROUP BY u.user_id
   HAVING report_count < 2
