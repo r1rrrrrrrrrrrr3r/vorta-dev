@@ -257,7 +257,9 @@ include __DIR__ . '/header.php';
                 <th class="pb-3 font-medium text-gray-600">Work Force</th>
                 <th class="pb-3 font-medium text-gray-600">Status</th>
                 <th class="pb-3 font-medium text-gray-600">Proof</th>
-                <th class="pb-3 font-medium text-gray-600">Action</th>
+                <th class="pb-3 font-medium text-gray-600">
+                  <span class="inline-block text-center" style="width:104px;">Action</span>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -304,29 +306,47 @@ include __DIR__ . '/header.php';
                     <?php endif; ?>
                   </td>
 
-                  <td class="py-4 whitespace-nowrap space-x-1">
-                    <?php if ($r['status'] === 'Progress'): ?>
+                  <td class="py-4 whitespace-nowrap">
+                    <div class="flex items-center gap-1">
+                      <?php if ($r['status'] === 'Progress'): ?>
+                        <button
+                          onclick="markAsDone(<?php echo $r['report_id']; ?>, this)"
+                          style="width:104px;"
+                          class="inline-flex items-center justify-center h-8 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition">
+                          Mark Complete
+                        </button>
+
+                        <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
+                          id="edit-<?php echo $r['report_id']; ?>"
+                          title="Edit report" aria-label="Edit report"
+                          class="inline-flex items-center justify-center w-8 h-8 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition">
+                          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                          </svg>
+                        </a>
+                      <?php else: ?>
+                        <span class="text-gray-400 text-sm" style="display:inline-block;width:104px;text-align:center;">
+                          Completed
+                        </span>
+
+                        <span
+                          title="Completed reports cannot be edited" aria-disabled="true"
+                          class="inline-flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-400 rounded cursor-not-allowed">
+                          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                          </svg>
+                        </span>
+                      <?php endif; ?>
+
                       <button
-                        onclick="markAsDone(<?php echo $r['report_id']; ?>, this)"
-                        class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition">
-                        Mark Complete
+                        onclick="deleteReport(<?php echo $r['report_id']; ?>, this)"
+                        title="Delete report" aria-label="Delete report"
+                        class="inline-flex items-center justify-center w-8 h-8 bg-red-600 text-white rounded hover:bg-red-700 transition">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
                       </button>
-
-                      <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
-                        id="edit-<?php echo $r['report_id']; ?>"
-                        class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
-                        Edit
-                      </a>
-                    <?php else: ?>
-                      <span class="text-gray-400 text-sm">Completed</span>
-                    <?php endif; ?>
-
-                    <button
-                      onclick="deleteReport(<?php echo $r['report_id']; ?>, this)"
-                      class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition"
-                      title="Delete report">
-                      Delete
-                    </button>
+                    </div>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -474,16 +494,24 @@ include __DIR__ . '/header.php';
               const statusEl = document.getElementById('status-' + reportId);
               statusEl.textContent = 'Completed';
               statusEl.className = 'status-badge px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800';
-              btn.textContent = 'Completed';
-              btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-              btn.classList.add('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
+
+              const done = document.createElement('span');
+              done.className = 'text-gray-400 text-sm';
+              done.style.cssText = 'display:inline-block;width:104px;text-align:center;';
+              done.textContent = 'Completed';
+              btn.replaceWith(done);
+
               const editLink = document.getElementById('edit-' + reportId);
-              if (editLink) editLink.remove();
+              if (editLink) {
+                const disabledEdit = document.createElement('span');
+                disabledEdit.title = 'Completed reports cannot be edited';
+                disabledEdit.setAttribute('aria-disabled', 'true');
+                disabledEdit.className = 'inline-flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-400 rounded cursor-not-allowed';
+                disabledEdit.innerHTML = editLink.innerHTML;
+                editLink.replaceWith(disabledEdit);
+              }
+
               Swal.fire('Success!', 'Report status updated.', 'success');
-            } else {
-              Swal.fire('Failed!', d.message, 'error');
-              btn.textContent = originalText;
-              btn.disabled = false;
             }
           })
           .catch(e => {
@@ -497,51 +525,50 @@ include __DIR__ . '/header.php';
   }
 
   function deleteReport(reportId, btn) {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: "This report will be permanently deleted!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel'
-    }).then((res) => {
-      if (res.isConfirmed) {
-        const row = document.getElementById('row-' + reportId);
-        const originalText = btn.textContent;
-        btn.textContent = 'Deleting...';
-        btn.disabled = true;
+  Swal.fire({
+    title: 'Are you sure?',
+    text: "This report will be permanently deleted!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!',
+    cancelButtonText: 'Cancel'
+  }).then((res) => {
+    if (res.isConfirmed) {
+      const row = document.getElementById('row-' + reportId);
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
 
-        fetch('delete_report_ajax.php', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin',
-            body: 'report_id=' + reportId
-          })
-          .then(r => r.json())
-          .then(d => {
-            if (d.success) {
-              row.classList.add('bg-red-50', 'animate-pulse');
-              setTimeout(() => {
-                row.remove();
-                Swal.fire('Deleted!', 'Report successfully deleted.', 'success');
-              }, 300);
-            } else {
-              Swal.fire('Failed!', d.message, 'error');
-              btn.textContent = originalText;
-              btn.disabled = false;
-            }
-          })
-          .catch(e => {
-            console.error(e);
-            Swal.fire('Error', 'A connection error occurred.', 'error');
-            btn.textContent = originalText;
+      fetch('delete_report_ajax.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'same-origin',
+          body: 'report_id=' + reportId
+        })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            row.classList.add('bg-red-50', 'animate-pulse');
+            setTimeout(() => {
+              row.remove();
+              Swal.fire('Deleted!', 'Report successfully deleted.', 'success');
+            }, 300);
+          } else {
+            Swal.fire('Failed!', d.message, 'error');
             btn.disabled = false;
-          });
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+        })
+        .catch(e => {
+          console.error(e);
+          Swal.fire('Error', 'A connection error occurred.', 'error');
+          btn.disabled = false;
+          btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        });
       }
     });
   }
@@ -623,45 +650,45 @@ include __DIR__ . '/header.php';
   }
 
   function showProof(btn) {
-    const link = (btn.dataset.link || '').trim();
-    const image = btn.dataset.image || '';
-    const isHttp = /^https?:\/\//i.test(link);
-    const label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px;';
+  const link = (btn.dataset.link || '').trim();
+  const image = btn.dataset.image || '';
+  const isHttp = /^https?:\/\//i.test(link);
+  const label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px;';
 
-    let html = '<div style="display:flex;flex-direction:column;gap:16px;text-align:left;">';
+  let html = '<div style="display:flex;flex-direction:column;gap:16px;text-align:left;">';
 
-    if (image) {
-      html += `<div>
-        <div style="${label}">Photo</div>
-        <a href="${escapeAttr(image)}" target="_blank" rel="noopener noreferrer">
-          <img src="${escapeAttr(image)}" alt="Proof photo" onerror="this.style.display='none'"
-            style="display:block;max-width:100%;max-height:320px;margin:0 auto;border-radius:12px;object-fit:contain;border:1px solid rgba(148,163,184,.35);">
-        </a>
-      </div>`;
-    }
+  if (image) {
+    html += `<div data-proof-photo>
+      <div style="${label}">Photo</div>
+      <a href="${escapeAttr(image)}" target="_blank" rel="noopener noreferrer">
+        <img src="${escapeAttr(image)}" alt="Proof photo" onerror="this.closest('[data-proof-photo]').style.display='none'"
+          style="display:block;max-width:100%;max-height:320px;margin:0 auto;border-radius:12px;object-fit:contain;border:1px solid rgba(148,163,184,.35);">
+      </a>
+    </div>`;
+  }
 
-    if (link) {
-      const linkHtml = isHttp ?
-        `<a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" style="color:#6366f1;text-decoration:underline;">${escapeHtml(link)}</a>` :
-        escapeHtml(link);
-      html += `<div>
-        <div style="${label}">Link</div>
-        <div style="border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:10px 14px;font-size:14px;word-break:break-all;">${linkHtml}</div>
-      </div>`;
-    }
+  if (link) {
+    const linkHtml = isHttp ?
+      `<a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" style="color:#6366f1;text-decoration:underline;">${escapeHtml(link)}</a>` :
+      escapeHtml(link);
+    html += `<div>
+      <div style="${label}">Link</div>
+      <div style="border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:10px 14px;font-size:14px;word-break:break-all;">${linkHtml}</div>
+    </div>`;
+  }
 
-    html += '</div>';
+  html += '</div>';
 
-    Swal.fire(Object.assign({
-      title: 'Report Proof',
-      html: html,
-      width: 560,
-      showCloseButton: true,
-      showConfirmButton: isHttp,
-      confirmButtonText: 'Open Link',
-      confirmButtonColor: '#4f46e5',
-      showCancelButton: true,
-      cancelButtonText: 'Close'
+  Swal.fire(Object.assign({
+    title: 'Report Proof',
+    html: html,
+    width: 560,
+    showCloseButton: true,
+    showConfirmButton: isHttp,
+    confirmButtonText: 'Open Link',
+    confirmButtonColor: '#4f46e5',
+    showCancelButton: true,
+    cancelButtonText: 'Close'
     }, swalTheme())).then((result) => {
       if (result.isConfirmed && isHttp) {
         window.open(link, '_blank', 'noopener,noreferrer');
