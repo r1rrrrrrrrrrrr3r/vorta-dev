@@ -514,7 +514,10 @@ include __DIR__ . '/header.php';
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-xl font-bold text-gray-800">Report Detail</h3>
-          <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">&times;</button>
+            <button onclick="closeModal()" aria-label="Close"
+              class="flex items-center justify-center w-9 h-9 rounded-full text-2xl leading-none text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
+              &times;
+            </button>
         </div>
         <div id="modalContent"></div>
       </div>
