@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 
 header('Content-Type: application/json');
@@ -40,6 +41,7 @@ $stmt = $pdo->prepare("DELETE FROM production_reports WHERE report_id = ? AND co
 $result = $stmt->execute([$report_id, $company_id]);
 
 if ($result) {
+    audit_log($pdo, 'report.deleted', 'production_reports', $report_id);
     echo json_encode(['success' => true, 'message' => 'Report deleted successfully']);
 } else {
     echo json_encode(['success' => false, 'message' => 'Failed to delete from database']);

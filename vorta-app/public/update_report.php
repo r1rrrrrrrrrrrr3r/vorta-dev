@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -92,6 +93,7 @@ $result = $stmt->execute([
 ]);
 
 if ($result) {
+    audit_log($pdo, 'report.updated', 'production_reports', $report_id);
     header("Location: my_reports.php?month=" . urlencode(date('Y-m', strtotime($report_date))) . "&edit=success");
 } else {
     header("Location: my_reports.php?edit=error");

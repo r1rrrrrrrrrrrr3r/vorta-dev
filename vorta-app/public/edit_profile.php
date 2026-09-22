@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 $company_id = current_company_id();
 
@@ -22,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['phone'] ?? ''
     );
     if ($result['ok']) {
+        audit_log($pdo, 'profile.updated', 'users', $user_id);
         $profileSuccess = $result['message'];
         $_SESSION['user']['name'] = trim($_POST['name']);
         $_SESSION['user']['email'] = trim($_POST['email']);

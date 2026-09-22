@@ -5,6 +5,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 
 if (!isset($_SESSION['user'])) {
@@ -56,6 +57,7 @@ try {
 
     $update = $pdo->prepare("UPDATE production_reports SET status = 'Completed' WHERE report_id = ? AND company_id = ?");
     $update->execute([$report_id, $company_id]);
+    audit_log($pdo, 'report.completed', 'production_reports', $report_id);
 
     echo json_encode([
         'success' => true,

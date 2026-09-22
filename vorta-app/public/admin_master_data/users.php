@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/account.php';
 require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
 $company_id = current_company_id();
 
@@ -58,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
           $pass_hash = password_hash($password, PASSWORD_DEFAULT);
           $stmt = $pdo->prepare("INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)");
           $stmt->execute([$company_id, $name, $email, $pass_hash, $role]);
+          audit_log($pdo, 'user.created', 'users', $pdo->lastInsertId(), ['role' => $role]);
           $_SESSION['success'] = "User added successfully.";
         }
       } elseif ($action === 'update') {
@@ -68,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
         } else {
           $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ? AND company_id = ?");
           $stmt->execute([$name, $email, $role, $user_id, $company_id]);
+          audit_log($pdo, 'user.updated', 'users', $user_id, ['role' => $role]);
           if (!empty($password)) {
             $pass_hash = password_hash($password, PASSWORD_DEFAULT);
             $pstmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ? AND company_id = ?");
@@ -99,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     } else {
       $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ? AND company_id = ?");
       $stmt->execute([$user_id, $company_id]);
+      audit_log($pdo, 'user.deleted', 'users', $user_id);
 
       if ($stmt->rowCount()) {
         $_SESSION['success'] = "User deleted successfully.";

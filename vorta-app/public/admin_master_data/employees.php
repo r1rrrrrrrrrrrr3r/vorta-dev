@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
 $company_id = current_company_id();
 
@@ -70,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         } else {
           $stmt = $pdo->prepare("INSERT INTO employees (company_id, user_id, name, position, phone) VALUES (?, ?, ?, ?, ?)");
           $stmt->execute([$company_id, $user_id, $name, $position, $phone]);
+          audit_log($pdo, 'employee.created', 'employees', $pdo->lastInsertId(), ['user_id' => $user_id]);
           $_SESSION['success'] = "Employee added successfully.";
         }
       } elseif ($action === 'update') {
@@ -93,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
           if (!isset($_SESSION['error'])) {
             $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ? AND company_id = ?");
             $stmt->execute([$name, $position, $phone, $employee_id, $company_id]);
+            audit_log($pdo, 'employee.updated', 'employees', $employee_id);
             $_SESSION['success'] = "Employee updated successfully.";
           }
         }
@@ -117,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_emp'])) {
   try {
     $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ? AND company_id = ?");
     $stmt->execute([$employee_id, $company_id]);
+    audit_log($pdo, 'employee.deleted', 'employees', $employee_id);
     $_SESSION['success'] = "Employee deleted successfully.";
   } catch (PDOException $e) {
     $_SESSION['error'] = "Failed to delete: " . $e->getMessage();

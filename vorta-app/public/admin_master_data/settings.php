@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/settings.php';
 require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -20,6 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
         'monthly_target_max' => $_POST['monthly_target_max'] ?? null,
         'daily_min_reports' => $_POST['daily_min_reports'] ?? null,
     ]);
+    if ($result['ok']) {
+        audit_log($pdo, 'settings.updated', 'app_settings');
+    }
 
     $_SESSION[$result['ok'] ? 'success' : 'error'] = $result['message'];
     $redirect = 'admin_master_data.php?tab=settings';

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
 $company_id = current_company_id();
 if (session_status() === PHP_SESSION_NONE) {
@@ -30,10 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
             if ($action === 'create') {
                 $stmt = $pdo->prepare("INSERT INTO job_type (company_id, name) VALUES (?, ?)");
                 $stmt->execute([$company_id, $name]);
+                audit_log($pdo, 'job_type.created', 'job_type', $pdo->lastInsertId());
                 $_SESSION['success'] = "Job type added successfully.";
             } elseif ($action === 'update') {
                 $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ? AND company_id = ?");
                 $stmt->execute([$name, $job_type_id, $company_id]);
+                audit_log($pdo, 'job_type.updated', 'job_type', $job_type_id);
                 if ($stmt->rowCount()) {
                     $_SESSION['success'] = "Job type updated successfully.";
                 } else {
@@ -64,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job_type'])) {
     try {
         $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ? AND company_id = ?");
         $stmt->execute([$job_type_id, $company_id]);
+        audit_log($pdo, 'job_type.deleted', 'job_type', $job_type_id);
 
         if ($stmt->rowCount()) {
             $_SESSION['success'] = "Job type deleted successfully.";

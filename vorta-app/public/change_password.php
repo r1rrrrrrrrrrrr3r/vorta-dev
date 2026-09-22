@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
@@ -19,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['confirm_password'] ?? ''
     );
     if ($result['ok']) {
+        audit_log($pdo, 'password.changed', 'users', $user_id);
         $success = $result['message'];
     } else {
         $error = $result['message'];
