@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_login();
 $company_id = current_company_id();
 
@@ -146,7 +147,7 @@ include __DIR__ . '/header.php';
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Proof (Photo)</label>
                         <?php if (!empty($report['proof_image'])): ?>
                             <div class="mb-3">
-                                <img src="../uploads/<?= htmlspecialchars(rawurlencode(basename($report['proof_image']))) ?>" alt="Current Proof"
+                                <img src="my_reports.php?proof_image=<?= (int)$report['report_id'] ?>" alt="Current Proof"
                                     class="max-w-xs h-auto rounded border shadow-sm">
                                 <p class="text-xs text-gray-500 mt-1">Current image. Leave empty to keep using this image.</p>
                             </div>

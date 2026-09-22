@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
 require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -21,9 +22,17 @@ $title = trim($_POST['title']);
 $description = trim($_POST['description']) ?: null;
 $proof_link = trim($_POST['proof_link']) ?: null;
 $workforce_id = (int)$_POST['workforce_id'];
+$allowedStatuses = ['Progress', 'Completed'];
 
-if (empty($title) || empty($report_date) || $job_type_id <= 0) {
+if (empty($title) || empty($report_date) || $job_type_id <= 0 || !in_array($status, $allowedStatuses, true)) {
     die("Incomplete data.");
+}
+if ($proof_link !== null && !filter_var($proof_link, FILTER_VALIDATE_URL)) {
+    die("Proof link must be a valid URL.");
+}
+$proofScheme = $proof_link !== null ? strtolower((string)parse_url($proof_link, PHP_URL_SCHEME)) : '';
+if ($proof_link !== null && !in_array($proofScheme, ['http', 'https'], true)) {
+    die("Proof link must use HTTP or HTTPS.");
 }
 
 $stmt_lookup = $pdo->prepare("SELECT name FROM job_type WHERE job_type_id = ? AND company_id = ?");
@@ -52,61 +61,12 @@ if (!$check->fetch()) {
 }
 
 $proof_image_path = null;
-$max_size = 1048576;
-
-if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_ERR_NO_FILE) {
-    if ($_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
-        die("Upload failed, PHP error code: " . $_FILES['proof_image']['error']);
+if (isset($_FILES['proof_image'])) {
+    $upload = upload_save_image($_FILES['proof_image'], $company_id);
+    if (!$upload['ok']) {
+        die($upload['message']);
     }
-    $file = $_FILES['proof_image'];
-
-    if ($file['size'] > $max_size) {
-        die("Image file size must not exceed 1 MB.");
-    }
-
-    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    $mime = mime_content_type($file['tmp_name']);
-    if (!in_array($mime, $allowed_types)) {
-        die("Unsupported image format. Use JPG, PNG, or WebP.");
-    }
-
-    $upload_dir = __DIR__ . '/../uploads/';
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0777, true);
-    }
-
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $new_filename = 'report_' . time() . '_' . uniqid() . '.' . ($mime === 'image/webp' ? 'webp' : ($mime === 'image/png' ? 'png' : 'jpg'));
-    $target_path = $upload_dir . $new_filename;
-
-    $success = false;
-    switch ($mime) {
-        case 'image/jpeg':
-        case 'image/jpg':
-            $image = imagecreatefromjpeg($file['tmp_name']);
-            $success = imagejpeg($image, $target_path, 80);
-            break;
-        case 'image/png':
-            $image = imagecreatefrompng($file['tmp_name']);
-            $bg = imagecreatetruecolor(imagesx($image), imagesy($image));
-            imagefill($bg, 0, 0, imagecolorallocate($bg, 255, 255, 255));
-            imagecopy($bg, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
-            $success = imagejpeg($bg, $target_path, 80);
-            imagedestroy($bg);
-            break;
-        case 'image/webp':
-            $image = imagecreatefromwebp($file['tmp_name']);
-            $success = imagejpeg($image, $target_path, 80);
-            break;
-    }
-
-    if (isset($image)) imagedestroy($image);
-
-    if (!$success) {
-        die("Failed to process image.");
-    }
-
-    $proof_image_path = '../uploads/' . $new_filename;
+    $proof_image_path = $upload['path'];
 }
 
 try {
@@ -134,5 +94,7 @@ try {
     header("Location: my_reports.php?success=report_saved");
     exit;
 } catch (PDOException $e) {
-    die("Failed to save report: " . $e->getMessage());
+    error_log('Failed to save report: ' . $e->getMessage());
+    http_response_code(500);
+    die("Failed to save report.");
 }

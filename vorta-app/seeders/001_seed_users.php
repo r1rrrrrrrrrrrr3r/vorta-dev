@@ -4,7 +4,10 @@ return [
     'run' => function (PDO $pdo) {
         echo "Seeding users...\n";
 
-        $defaultPassword = 'password123';
+        $defaultPassword = getenv('SEED_DEFAULT_PASSWORD');
+        if (!is_string($defaultPassword) || strlen($defaultPassword) < 12) {
+            throw new RuntimeException('Set SEED_DEFAULT_PASSWORD to a unique password of at least 12 characters before running this seeder.');
+        }
 
         $users = [
             ['name' => 'System Administrator', 'email' => 'admin@vorta.local', 'role' => 'admin'],
@@ -42,6 +45,6 @@ return [
             }
         }
 
-        echo "Users seeding complete. Default password for all accounts: $defaultPassword\n";
+        echo "Users seeding complete. Credentials were supplied through the environment.\n";
     }
 ];

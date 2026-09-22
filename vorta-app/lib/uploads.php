@@ -7,7 +7,15 @@ function storage_root(): string
 
 function uploads_dir(int $companyId): string
 {
-    $dir = storage_root() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $companyId;
+    $root = storage_root();
+    if (!is_dir($root)) {
+        mkdir($root, 0750, true);
+    }
+    $rootHt = $root . DIRECTORY_SEPARATOR . '.htaccess';
+    if (!is_file($rootHt)) {
+        file_put_contents($rootHt, "Require all denied\n");
+    }
+    $dir = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $companyId;
     if (!is_dir($dir)) {
         mkdir($dir, 0750, true);
     }
@@ -36,6 +44,10 @@ function upload_save_image(array $file, int $companyId, int $maxBytes = 1048576)
     }
 
     $mime = mime_content_type($tmp);
+    $dimensions = @getimagesize($tmp);
+    if (!$dimensions || $dimensions[0] < 1 || $dimensions[1] < 1 || $dimensions[0] > 6000 || $dimensions[1] > 6000) {
+        return ['ok' => false, 'message' => 'Image dimensions must not exceed 6000 by 6000 pixels.'];
+    }
     $allowed = ['image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     if (!isset($allowed[$mime])) {
         return ['ok' => false, 'message' => 'Unsupported image format. Use JPG, PNG, or WebP.'];

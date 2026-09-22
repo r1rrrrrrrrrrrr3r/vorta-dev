@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
 require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_login();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -36,42 +37,45 @@ $status = $_POST['status'] ?? '';
 $workforce_id = $_POST['workforce_id'] ?? null;
 $proof_link = $_POST['proof_link'] ?? null;
 $proof_image = $report['proof_image'];
+$allowedStatuses = ['Progress', 'Completed'];
 
-if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_ERR_NO_FILE) {
-    $file = $_FILES['proof_image'];
-    if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] > 1048576 || !is_uploaded_file($file['tmp_name'])) {
-        die("Invalid image upload.");
+if (!in_array($status, $allowedStatuses, true)) {
+    http_response_code(400);
+    exit('Invalid report status.');
+}
+$jobTypeStmt = $pdo->prepare('SELECT name FROM job_type WHERE name = ? AND company_id = ? LIMIT 1');
+$jobTypeStmt->execute([trim((string)$job_type), $company_id]);
+if (!$jobTypeStmt->fetch()) {
+    http_response_code(400);
+    exit('Invalid job type.');
+}
+$workforceStmt = $pdo->prepare('SELECT workforce_id FROM work_force WHERE workforce_id = ? AND company_id = ?');
+$workforceStmt->execute([(int)$workforce_id, $company_id]);
+if (!$workforceStmt->fetch()) {
+    http_response_code(400);
+    exit('Invalid workforce.');
+}
+$proof_link = trim((string)$proof_link) ?: null;
+if ($proof_link !== null) {
+    $scheme = strtolower((string)parse_url($proof_link, PHP_URL_SCHEME));
+    if (!filter_var($proof_link, FILTER_VALIDATE_URL) || !in_array($scheme, ['http', 'https'], true)) {
+        http_response_code(400);
+        exit('Proof link must use HTTP or HTTPS.');
     }
-    $mime = mime_content_type($file['tmp_name']);
-    $allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!in_array($mime, $allowed, true)) {
-        die("Unsupported image format.");
+}
+
+if (isset($_FILES['proof_image'])) {
+    $upload = upload_save_image($_FILES['proof_image'], $company_id);
+    if (!$upload['ok']) {
+        die($upload['message']);
     }
-    $image = null;
-    if ($mime === 'image/jpeg') {
-        $image = @imagecreatefromjpeg($file['tmp_name']);
-    } elseif ($mime === 'image/png') {
-        $image = @imagecreatefrompng($file['tmp_name']);
-    } elseif ($mime === 'image/webp') {
-        $image = @imagecreatefromwebp($file['tmp_name']);
-    }
-    if (!$image) {
-        die("Failed to process image.");
-    }
-    $filename = 'proof_' . bin2hex(random_bytes(12)) . '.jpg';
-    $path = __DIR__ . '/../uploads/' . $filename;
-    $success = imagejpeg($image, $path, 80);
-    imagedestroy($image);
-    if (!$success) {
-        die("Failed to save image.");
-    }
-    if ($report['proof_image'] && preg_match('/^[A-Za-z0-9._-]+$/', $report['proof_image'])) {
-        $oldPath = __DIR__ . '/../uploads/' . $report['proof_image'];
-        if (is_file($oldPath)) {
+    if ($upload['path'] !== null) {
+        $proof_image = $upload['path'];
+        $oldPath = upload_absolute_path($report['proof_image']);
+        if ($oldPath && is_file($oldPath)) {
             unlink($oldPath);
         }
     }
-    $proof_image = $filename;
 }
 
 $stmt = $pdo->prepare("UPDATE production_reports SET 

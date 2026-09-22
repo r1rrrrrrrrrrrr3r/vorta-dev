@@ -25,6 +25,40 @@ if (isset($_SESSION['error'])) {
   unset($_SESSION['error']);
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revoke_invite'])) {
+  csrf_verify();
+  $invitationId = (int)$_POST['revoke_invite'];
+  $stmt = $pdo->prepare('DELETE FROM company_invitations WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL');
+  $stmt->execute([$invitationId, $company_id]);
+  $_SESSION[$stmt->rowCount() ? 'success' : 'error'] = $stmt->rowCount() ? 'Invitation revoked.' : 'Invitation not found.';
+  header('Location: admin_master_data.php?tab=users');
+  exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_invite'])) {
+  csrf_verify();
+  $invitationId = (int)$_POST['resend_invite'];
+  $pendingStmt = $pdo->prepare('SELECT email FROM company_invitations WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL LIMIT 1');
+  $pendingStmt->execute([$invitationId, $company_id]);
+  $pending = $pendingStmt->fetch(PDO::FETCH_ASSOC);
+  if (!$pending) {
+    $_SESSION['error'] = 'Invitation not found.';
+  } else {
+    try {
+      $rawToken = bin2hex(random_bytes(32));
+      $update = $pdo->prepare('UPDATE company_invitations SET token_hash = ?, expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY), created_at = CURRENT_TIMESTAMP WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL');
+      $update->execute([hash('sha256', $rawToken), $invitationId, $company_id]);
+      $_SESSION['invite_url'] = rtrim($BASE_URL, '/') . '/accept_invite.php?token=' . urlencode($rawToken);
+      $_SESSION['success'] = 'Invitation renewed. Copy the new link below.';
+      audit_log($pdo, 'user.invite_resent', 'company_invitations', $invitationId, ['email' => $pending['email']]);
+    } catch (Throwable $e) {
+      $_SESSION['error'] = 'Failed to resend the invitation.';
+    }
+  }
+  header('Location: admin_master_data.php?tab=users');
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'user_invite') {
   csrf_verify();
   $email = strtolower(trim((string)($_POST['invite_email'] ?? '')));
@@ -32,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'user_
 
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $_SESSION['error'] = 'Enter a valid email address.';
+  } elseif ($BASE_URL === '') {
+    $_SESSION['error'] = 'Invitations are unavailable until APP_URL is configured.';
   } elseif (!in_array($role, ['admin', 'manager', 'staff'], true)) {
     $_SESSION['error'] = 'Choose a valid invitation role.';
   } else {
@@ -99,6 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'user_
 
         if (!$pending) {
           $_SESSION['error'] = 'Invitation not found.';
+        } elseif ($BASE_URL === '') {
+          $_SESSION['error'] = 'Invitations are unavailable until APP_URL is configured.';
         } else {
           try {
             $rawToken = bin2hex(random_bytes(32));
@@ -503,13 +541,13 @@ function page_url($p)
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editUser(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>, <?= json_encode($u['email']) ?>, <?= json_encode($u['role']) ?>)'
+                    onclick="editUser(<?= (int)$u['user_id'] ?>, <?= htmlspecialchars(json_encode($u['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($u['email'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($u['role'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDelete(<?= (int)$u['user_id'] ?>, <?= json_encode($u['name']) ?>)'
+                    onclick="confirmDelete(<?= (int)$u['user_id'] ?>, <?= htmlspecialchars(json_encode($u['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>

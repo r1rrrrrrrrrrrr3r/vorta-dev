@@ -17,8 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rawToken = bin2hex(random_bytes(32));
             $insert = $pdo->prepare("INSERT INTO account_tokens (user_id, purpose, token_hash, expires_at) VALUES (?, 'password_reset', ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))");
             $insert->execute([$userId, hash('sha256', $rawToken)]);
-            $url = rtrim($BASE_URL, '/') . '/reset_password.php?token=' . urlencode($rawToken);
-            send_simple_mail($email, 'Reset your Vorta password', '<p>Reset your Vorta password within one hour:</p><p><a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Reset password</a></p>');
+            if ($BASE_URL !== '') {
+                $url = $BASE_URL . '/reset_password.php?token=' . urlencode($rawToken);
+                send_simple_mail($email, 'Reset your Vorta password', '<p>Reset your Vorta password within one hour:</p><p><a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Reset password</a></p>');
+            } else {
+                error_log('Password reset link not sent: APP_URL is not configured.');
+            }
         }
     }
     $message = 'If an active account exists for that email, a password reset link has been sent.';

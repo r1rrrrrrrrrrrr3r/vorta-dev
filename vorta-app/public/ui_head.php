@@ -1,7 +1,9 @@
 <?php
+require_once __DIR__ . '/../lib/csrf.php';
 
 $uiTheme = $_SESSION['user']['theme'] ?? '';
 $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
+$uiCsrfToken = csrf_token();
 ?>
 <link rel="stylesheet" href="css/theme.css">
 <script>
@@ -38,6 +40,7 @@ $uiLayout = $_SESSION['user']['nav_layout'] ?? '';
     root.setAttribute('data-nav', layout);
 
     function persist(body) {
+      body += '&csrf_token=' + encodeURIComponent(<?= json_encode($uiCsrfToken) ?>);
       fetch('save_preferences.php', {
         method: 'POST',
         headers: {

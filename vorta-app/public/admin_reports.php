@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_admin();
 $company_id = current_company_id();
 
@@ -35,8 +36,8 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 if (isset($_GET['proof_image'])) {
     $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
     $file = $row ? basename((string)$row['proof_image']) : '';
-    $path = __DIR__ . '/../uploads/' . $file;
-    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
+    $path = $row ? upload_absolute_path((string)$row['proof_image']) : null;
+    $mime = ($file !== '' && $path && is_file($path)) ? mime_content_type($path) : false;
     if (!$mime || strpos($mime, 'image/') !== 0) {
         http_response_code(404);
         exit;
@@ -65,7 +66,7 @@ if (isset($_GET['detail'])) {
     $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
     $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
     $hasImage = $imageFile !== '';
-    $imageExists = $hasImage && is_file(__DIR__ . '/../uploads/' . $imageFile);
+    $imageExists = $hasImage && upload_absolute_path((string)$row['proof_image']) !== null;
     $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
 
     $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';

@@ -4,7 +4,9 @@ require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/settings.php';
 require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/audit.php';
+require_once __DIR__ . '/../../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -16,11 +18,22 @@ unset($_SESSION['success'], $_SESSION['error']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'settings') {
     csrf_verify();
+    $timezone = trim((string)($_POST['timezone'] ?? ''));
+    if (!in_array($timezone, timezone_identifiers_list(), true)) {
+        $result = ['ok' => false, 'message' => 'Choose a valid timezone.'];
+    } else {
     $result = settings_save($pdo, [
         'monthly_target_min' => $_POST['monthly_target_min'] ?? null,
         'monthly_target_max' => $_POST['monthly_target_max'] ?? null,
         'daily_min_reports' => $_POST['daily_min_reports'] ?? null,
     ]);
+        if ($result['ok']) {
+            $timezoneStmt = $pdo->prepare('UPDATE companies SET timezone = ? WHERE company_id = ?');
+            $timezoneStmt->execute([$timezone, $company_id]);
+            $_SESSION['company']['timezone'] = $timezone;
+            tenant_apply_timezone();
+        }
+    }
     if ($result['ok']) {
         audit_log($pdo, 'settings.updated', 'app_settings');
     }
@@ -33,6 +46,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
 
 $target = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
+$companyStmt = $pdo->prepare('SELECT timezone FROM companies WHERE company_id = ?');
+$companyStmt->execute([$company_id]);
+$companyTimezone = (string)($companyStmt->fetchColumn() ?: 'Asia/Jakarta');
+$timezoneOptions = [
+    'UTC' => 'UTC',
+    'Asia/Jakarta' => 'Asia/Jakarta (WIB)',
+    'Asia/Singapore' => 'Asia/Singapore (SGT)',
+    'Asia/Tokyo' => 'Asia/Tokyo (JST)',
+    'Asia/Manila' => 'Asia/Manila (PHT)',
+    'Australia/Sydney' => 'Australia/Sydney',
+    'Europe/London' => 'Europe/London',
+    'Europe/Paris' => 'Europe/Paris',
+    'America/New_York' => 'America/New_York',
+    'America/Los_Angeles' => 'America/Los_Angeles',
+];
+if (!isset($timezoneOptions[$companyTimezone]) && in_array($companyTimezone, timezone_identifiers_list(), true)) {
+    $timezoneOptions = [$companyTimezone => $companyTimezone] + $timezoneOptions;
+}
 ?>
 
 <?php if ($success): ?>
@@ -60,6 +91,18 @@ $dailyMin = settings_get_daily_min_reports($pdo);
         <input type="number" name="monthly_target_min" min="1" value="<?= (int) $target['min'] ?>"
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           placeholder="Example: 50" required>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Company timezone</label>
+        <select name="timezone" required
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <?php foreach ($timezoneOptions as $value => $label): ?>
+            <option value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" <?= $companyTimezone === $value ? 'selected' : '' ?>>
+              <?= htmlspecialchars($label) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Dates, reminders, and report periods use this timezone.</p>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Maximum</label>
@@ -104,6 +147,10 @@ $dailyMin = settings_get_daily_min_reports($pdo);
             <td class="py-4 whitespace-nowrap text-sm text-gray-600">
               <?= (int) $target['min'] ?> items
             </td>
+          </tr>
+          <tr class="hover:bg-gray-50 transition">
+            <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">Company timezone</td>
+            <td class="py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($companyTimezone) ?></td>
           </tr>
                     <tr class="hover:bg-gray-50 transition">
             <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">

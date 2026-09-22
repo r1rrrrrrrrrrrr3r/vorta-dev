@@ -54,7 +54,7 @@ if (isset($_POST['submitAbsenceReason'])) {
             exit;
         }
 
-        $stmt = $pdo->prepare("UPDATE attendance SET status = ?, notes = ?, explanation = ?, updated_at = NOW()
+        $stmt = $pdo->prepare("UPDATE attendance SET status = ?, notes = ?, explanation = ?
                               WHERE user_id = ? AND company_id = ? AND date = ?");
         $stmt->execute([$absence_type, "Absence Reason: $absence_type", $explanation, $user_id, $company_id, $absence_date]);
     } else {

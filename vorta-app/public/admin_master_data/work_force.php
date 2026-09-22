@@ -212,13 +212,13 @@ function page_url($p)
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editWorkforce(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
+                    onclick="editWorkforce(<?= (int)$wf['workforce_id'] ?>, <?= htmlspecialchars(json_encode($wf['workforce_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDelete(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
+                    onclick="confirmDelete(<?= (int)$wf['workforce_id'] ?>, <?= htmlspecialchars(json_encode($wf['workforce_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>

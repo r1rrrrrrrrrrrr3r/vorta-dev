@@ -125,28 +125,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'emplo
     $_SESSION['error'] = 'CSV files must be 2 MB or smaller.';
   } else {
     $handle = fopen($file['tmp_name'], 'rb');
-    $header = $handle ? fgetcsv($handle) : false;
-    $header = $header ? array_map(static fn($value) => strtolower(trim((string)$value)), $header) : [];
-    $required = ['email', 'name', 'position', 'phone'];
-    if ($header !== $required) {
-      $errors[] = 'Header must be exactly: email,name,position,phone';
+    $firstLine = $handle ? fgets($handle) : false;
+    $delimiter = ',';
+    if (is_string($firstLine)) {
+      $counts = [
+        ',' => substr_count($firstLine, ','),
+        ';' => substr_count($firstLine, ';'),
+        "\t" => substr_count($firstLine, "\t"),
+      ];
+      arsort($counts);
+      $delimiter = (string)array_key_first($counts);
+      rewind($handle);
+    }
+    $header = $handle ? fgetcsv($handle, 0, $delimiter) : false;
+    $normalizeHeader = static function ($value): string {
+      $value = preg_replace('/^\xEF\xBB\xBF/', '', (string)$value);
+      return strtolower(trim((string)preg_replace('/[^a-z0-9]+/', '_', $value), '_'));
+    };
+    $header = $header ? array_map($normalizeHeader, $header) : [];
+    $headerMap = [];
+    foreach ($header as $index => $column) {
+      if ($column !== '') {
+        if (isset($headerMap[$column])) {
+          $errors[] = "Header contains duplicate column: {$column}.";
+          continue;
+        }
+        $headerMap[$column] = $index;
+      }
+    }
+    $required = ['email', 'name', 'position'];
+    $missing = array_values(array_diff($required, array_keys($headerMap)));
+    if ($missing) {
+      $errors[] = 'Missing required column(s): ' . implode(', ', $missing) . '. Use email, name, position, and optional phone.';
     } else {
       $userStmt = $pdo->prepare('SELECT user_id FROM users WHERE email = ? AND company_id = ?');
       $employeeCheck = $pdo->prepare('SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?');
       $insert = $pdo->prepare('INSERT INTO employees (company_id, user_id, name, position, phone) VALUES (?, ?, ?, ?, ?)');
       $seen = [];
       $rowNumber = 1;
+      $dataRows = 0;
       while (($row = fgetcsv($handle)) !== false) {
         $rowNumber++;
         if (count($row) === 1 && trim((string)$row[0]) === '') continue;
-        if (count($row) !== 4) {
-          $errors[] = "Row {$rowNumber}: expected 4 columns.";
+        $dataRows++;
+        if ($dataRows > 1000) {
+          $errors[] = 'Import stopped after 1,000 data rows.';
+          break;
+        }
+        foreach ($row as $cell) {
+          if (!mb_check_encoding((string)$cell, 'UTF-8') || strpos((string)$cell, "\0") !== false || preg_match('/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/', (string)$cell)) {
+            $errors[] = "Row {$rowNumber}: contains unsupported control characters.";
+            continue 2;
+          }
+          if (preg_match('/^\s*[=+\-@]/', (string)$cell)) {
+            $errors[] = "Row {$rowNumber}: formula-like values are not allowed.";
+            continue 2;
+          }
+          if (mb_strlen((string)$cell) > 255) {
+            $errors[] = "Row {$rowNumber}: a field is longer than 255 characters.";
+            continue 2;
+          }
+        }
+        $getCell = static function (array $row, array $headerMap, string $column): string {
+          $index = $headerMap[$column] ?? null;
+          return $index !== null ? trim((string)($row[$index] ?? '')) : '';
+        };
+        $email = $getCell($row, $headerMap, 'email');
+        $name = $getCell($row, $headerMap, 'name');
+        $position = $getCell($row, $headerMap, 'position');
+        $phone = $getCell($row, $headerMap, 'phone');
+        if (count($row) < count($header)) {
+          $errors[] = "Row {$rowNumber}: has fewer fields than the header.";
           continue;
         }
-        [$email, $name, $position, $phone] = array_map(static fn($value) => trim((string)$value), $row);
         $emailKey = strtolower($email);
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '' || !in_array($position, $position_enum, true) || isset($seen[$emailKey])) {
-          $errors[] = "Row {$rowNumber}: invalid email/name/position or duplicate email.";
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+          $errors[] = "Row {$rowNumber}: invalid email.";
+          continue;
+        }
+        if ($name === '') {
+          $errors[] = "Row {$rowNumber}: name is required.";
+          continue;
+        }
+        if (!in_array($position, $position_enum, true)) {
+          $errors[] = "Row {$rowNumber}: position '{$position}' is not allowed. Use: " . implode(', ', $position_enum) . '.';
+          continue;
+        }
+        if (isset($seen[$emailKey])) {
+          $errors[] = "Row {$rowNumber}: duplicate email in this file.";
           continue;
         }
         $seen[$emailKey] = true;
@@ -174,7 +240,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'emplo
   }
   $params = ['tab' => 'employees', 'page' => $page];
   if ($search) $params['search'] = $search;
-  header('Location: admin_master_data.php?' . http_build_query($params));
+  $redirect = 'admin_master_data.php?' . http_build_query($params);
+  echo '<script>window.location.href = ' . json_encode($redirect, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';</script>';
   exit;
 }
 
@@ -358,7 +425,7 @@ function page_url($p)
       <div>
         <h2 class="vorta-import__title">Import employees in bulk</h2>
         <p class="vorta-import__subtitle">Upload a CSV exported from Excel. User accounts must already exist.</p>
-        <p class="vorta-import__chip">Columns: <code>email,name,position,phone</code></p>
+        <p class="vorta-import__chip">Required columns: <code>email,name,position</code> · optional: <code>phone</code></p>
       </div>
     </div>
     <a href="data:text/csv;charset=utf-8,email%2Cname%2Cposition%2Cphone%0Aemployee%40example.com%2CJane%20Doe%2CEmployee%2C08123456789"
@@ -452,13 +519,13 @@ function page_url($p)
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= json_encode($e['name']) ?>, <?= json_encode($e['position'] ?? '') ?>, <?= json_encode($e['phone'] ?? '') ?>)'
+                    onclick="editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= htmlspecialchars(json_encode($e['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($e['position'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($e['phone'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= json_encode($e['name']) ?>)'
+                    onclick="confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= htmlspecialchars(json_encode($e['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>
