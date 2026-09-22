@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/settings.php';
+require_once __DIR__ . '/../../lib/csrf.php';
 require_admin();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -13,6 +14,7 @@ $error = $_SESSION['error'] ?? '';
 unset($_SESSION['success'], $_SESSION['error']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'settings') {
+    csrf_verify();
     $result = settings_save($pdo, [
         'monthly_target_min' => $_POST['monthly_target_min'] ?? null,
         'monthly_target_max' => $_POST['monthly_target_max'] ?? null,
@@ -45,6 +47,7 @@ $dailyMin = settings_get_daily_min_reports($pdo);
     Monthly Target
   </h2>
   <form method="POST" id="settings-form">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="settings">
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

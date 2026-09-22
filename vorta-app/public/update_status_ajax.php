@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/csrf.php';
 require_login();
 
 if (!isset($_SESSION['user'])) {
@@ -18,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(400);
     exit;
 }
+csrf_verify();
 
 $data = $_POST;
 $report_id = (int)($data['report_id'] ?? 0);

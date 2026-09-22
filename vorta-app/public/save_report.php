@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/csrf.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -8,6 +9,7 @@ $user_id = $_SESSION['user']['user_id'];
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die("Access denied.");
 }
+csrf_verify();
 
 $report_date = $_POST['report_date'] ?? date('Y-m-d');
 $job_type_id = (int)$_POST['job_type'];

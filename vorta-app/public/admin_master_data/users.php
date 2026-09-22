@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/account.php';
 require_admin();
 
 $success = '';
@@ -23,6 +25,7 @@ $perPage = 10;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users') {
+  csrf_verify();
   $name = trim($_POST['name'] ?? '');
   $email = trim($_POST['email'] ?? '');
   $password = $_POST['password'] ?? '';
@@ -38,6 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
     $_SESSION['error'] = "Name and email are required.";
   } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $_SESSION['error'] = "Invalid email format.";
+  } elseif ($action === 'create' && mb_strlen($password) < ACCOUNT_MIN_PASSWORD_LENGTH) {
+    $_SESSION['error'] = "A password of at least " . ACCOUNT_MIN_PASSWORD_LENGTH . " characters is required.";
+  } elseif ($action === 'update' && $password !== '' && mb_strlen($password) < ACCOUNT_MIN_PASSWORD_LENGTH) {
+    $_SESSION['error'] = "Password must be at least " . ACCOUNT_MIN_PASSWORD_LENGTH . " characters.";
   } else {
     try {
       if ($action === 'create') {
@@ -46,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
         if ($check->fetch()) {
           $_SESSION['error'] = "Email is already in use.";
         } else {
-          $pass_hash = password_hash($password ?: 'password', PASSWORD_DEFAULT);
+          $pass_hash = password_hash($password, PASSWORD_DEFAULT);
           $stmt = $pdo->prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)");
           $stmt->execute([$name, $email, $pass_hash, $role]);
           $_SESSION['success'] = "User added successfully.";
@@ -81,16 +88,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
   exit;
 }
 
-if (isset($_GET['delete_user'])) {
-  $user_id = (int)$_GET['delete_user'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+  csrf_verify();
+  $user_id = (int)$_POST['delete_user'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-
-    if ($stmt->rowCount()) {
-      $_SESSION['success'] = "User deleted successfully.";
+    if ($user_id === (int)($_SESSION['user']['user_id'] ?? 0)) {
+      $_SESSION['error'] = "You cannot delete your own account.";
     } else {
-      $_SESSION['error'] = "User not found.";
+      $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
+      $stmt->execute([$user_id]);
+
+      if ($stmt->rowCount()) {
+        $_SESSION['success'] = "User deleted successfully.";
+      } else {
+        $_SESSION['error'] = "User not found.";
+      }
     }
   } catch (PDOException $e) {
     $_SESSION['error'] = "Failed to delete data.";
@@ -153,6 +165,7 @@ function page_url($p)
     Added New User
   </h2>
   <form method="POST" id="user-form">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="users">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="user_id" value="" id="user-id-input">
@@ -176,8 +189,8 @@ function page_url($p)
         <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
         <input type="password" name="password" id="user-password"
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          placeholder="Leave blank if you don't want to change it.">
-        <p class="text-xs text-gray-500 mt-1">If empty when adding, default password: <code>password</code></p>
+          placeholder="At least <?= ACCOUNT_MIN_PASSWORD_LENGTH ?> characters">
+        <p class="text-xs text-gray-500 mt-1">Required when adding a user; leave blank only when editing without changing it.</p>
       </div>
 
       <div>
@@ -378,6 +391,24 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
+  function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+      ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+      [name, value]
+    ].forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function confirmDelete(id, name) {
     Swal.fire({
       title: 'Delete this record?',
@@ -390,12 +421,7 @@ function page_url($p)
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('delete_user', id);
-        url.searchParams.set('tab', 'users');
-        if ('<?= $search ?>' !== '') url.searchParams.set('search', '<?= addslashes($search) ?>');
-        if (<?= $page ?> > 1) url.searchParams.set('page', <?= $page ?>);
-        window.location.href = url.toString();
+        submitDelete('delete_user', id);
       }
     });
   }

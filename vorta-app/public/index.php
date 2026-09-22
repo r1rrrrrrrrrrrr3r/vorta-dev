@@ -1,25 +1,39 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/login_guard.php';
+require_once __DIR__ . '/../lib/tenant.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $email = $_POST['email'] ?? '';
+  csrf_verify();
+  $email = trim((string)($_POST['email'] ?? ''));
   $password = $_POST['password'] ?? '';
-  $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
-  $stmt->execute([$email]);
-  $user = $stmt->fetch();
-  if ($user && password_verify($password, $user['password_hash'])) {
+  if (login_is_locked($pdo, $email)) {
+    $error = "Too many failed attempts. Please try again later.";
+  } else {
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+  }
+  if (!empty($user) && password_verify($password, $user['password_hash'])) {
+    login_record_attempt($pdo, $email, true);
+    session_regenerate_id(true);
     $_SESSION['user'] = [
       'user_id' => $user['user_id'],
       'name' => $user['name'],
       'email' => $user['email'],
       'role' => $user['role'],
+      'company_id' => (int)($user['company_id'] ?? 0),
       'theme' => $user['theme'] ?? 'system',
       'nav_layout' => $user['nav_layout'] ?? 'sidebar'
     ];
+    $_SESSION['company'] = company_load($pdo, (int)($user['company_id'] ?? 0)) ?: [];
+    tenant_apply_timezone();
     header("Location: dashboard.php");
     exit;
-  } else {
+  } elseif (!isset($error)) {
+    login_record_attempt($pdo, $email, false);
     $error = "Incorrect email or password.";
   }
 }
@@ -58,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endif; ?>
 
       <form method="post" class="space-y-6">
+        <?= csrf_field() ?>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input type="email" name="email" required

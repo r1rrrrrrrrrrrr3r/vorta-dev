@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
 require_admin();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -41,6 +42,7 @@ function getEnumValues($pdo, $table, $column)
 $position_enum = getEnumValues($pdo, 'employees', 'position');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
+  csrf_verify();
   $name = trim($_POST['name'] ?? '');
   $position = trim($_POST['position'] ?? '');
   $phone = trim($_POST['phone'] ?? '');
@@ -107,8 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   exit;
 }
 
-if (isset($_GET['delete_emp'])) {
-  $employee_id = (int)$_GET['delete_emp'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_emp'])) {
+  csrf_verify();
+  $employee_id = (int)$_POST['delete_emp'];
   try {
     $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ?");
     $stmt->execute([$employee_id]);
@@ -195,6 +198,7 @@ function page_url($p)
     <div class="text-sm text-gray-600">Total Employees: <span class="font-medium"><?= $totalEmployees ?></span></div>
   </div>
   <form method="POST">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="employees">
     <input type="hidden" name="action" value="create" id="emp-action">
     <input type="hidden" name="employee_id" value="" id="emp-id">
@@ -214,7 +218,7 @@ function page_url($p)
               <?= $is_used && !$is_current ? 'disabled' : '' ?>
               <?= ($current_user_id ?? '') == $u['user_id'] ? 'selected' : '' ?>>
               <?= htmlspecialchars($u['name']) ?>
-              <?php if ($is_used && !$is_current): ?> (Sudah jadi employee) <?php endif; ?>
+              <?php if ($is_used && !$is_current): ?> (Employee) <?php endif; ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -426,6 +430,24 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
+  function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+      ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+      [name, value]
+    ].forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function confirmDeleteEmployee(employeeId, employeeName) {
     Swal.fire({
       title: 'Delete this record?',
@@ -438,7 +460,7 @@ function page_url($p)
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        window.location.href = `<?= page_url($page) ?>&delete_emp=${employeeId}`;
+        submitDelete('delete_emp', employeeId);
       }
     });
   }

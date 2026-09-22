@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/csrf.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -46,6 +47,7 @@ include __DIR__ . '/header.php';
         </h1>
 
         <form action="save_report.php" method="POST" enctype="multipart/form-data" class="space-y-6">
+          <?= csrf_field() ?>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

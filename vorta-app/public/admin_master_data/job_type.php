@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
 require_admin();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -15,6 +16,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
+    csrf_verify();
     $name = trim($_POST['name']);
     $action = $_POST['action'] ?? '';
     $job_type_id = (int)($_POST['job_type_id'] ?? 0);
@@ -54,8 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     }
 }
 
-if (isset($_GET['delete_job_type'])) {
-    $job_type_id = (int)$_GET['delete_job_type'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job_type'])) {
+    csrf_verify();
+    $job_type_id = (int)$_POST['delete_job_type'];
     try {
         $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ?");
         $stmt->execute([$job_type_id]);
@@ -124,6 +127,7 @@ function page_url($p) {
     Added New Job Type
   </h2>
   <form method="POST">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="job_type">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="job_type_id" value="" id="job-type-id-input">
@@ -305,6 +309,24 @@ document.getElementById('cancel-edit')?.addEventListener('click', function () {
     this.classList.add('hidden');
 });
 
+function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+        ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+        [name, value]
+    ].forEach(([key, val]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = val;
+        form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+}
+
 function confirmDelete(id, name) {
     Swal.fire({
         title: 'Delete this record?',
@@ -317,9 +339,7 @@ function confirmDelete(id, name) {
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('delete_job_type', id);
-            window.location.href = url.toString();
+            submitDelete('delete_job_type', id);
         }
     });
 }

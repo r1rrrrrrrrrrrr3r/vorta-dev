@@ -2,8 +2,9 @@
 
 function settings_get(PDO $pdo, string $key, $default = null)
 {
-    $stmt = $pdo->prepare("SELECT setting_value FROM app_settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
+    $companyId = (int)($_SESSION['user']['company_id'] ?? 1);
+    $stmt = $pdo->prepare("SELECT setting_value FROM app_settings WHERE company_id = ? AND setting_key = ?");
+    $stmt->execute([$companyId, $key]);
     $row = $stmt->fetch();
     return $row ? $row['setting_value'] : $default;
 }
@@ -23,6 +24,7 @@ function settings_get_daily_min_reports(PDO $pdo): int
 
 function settings_save(PDO $pdo, array $values): array
 {
+    $companyId = (int)($_SESSION['user']['company_id'] ?? 1);
     $min = isset($values['monthly_target_min']) ? (int) $values['monthly_target_min'] : null;
     $max = isset($values['monthly_target_max']) ? (int) $values['monthly_target_max'] : null;
     $dailyMin = isset($values['daily_min_reports']) ? (int) $values['daily_min_reports'] : null;
@@ -37,11 +39,11 @@ function settings_save(PDO $pdo, array $values): array
         return ['ok' => false, 'message' => 'Minimum tidak boleh lebih besar dari maksimum.'];
     }
 
-    $stmt = $pdo->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)
+    $stmt = $pdo->prepare("INSERT INTO app_settings (company_id, setting_key, setting_value) VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
-    $stmt->execute(['monthly_target_min', (string) $min]);
-    $stmt->execute(['monthly_target_max', (string) $max]);
-    $stmt->execute(['daily_min_reports', (string) $dailyMin]);
+    $stmt->execute([$companyId, 'monthly_target_min', (string) $min]);
+    $stmt->execute([$companyId, 'monthly_target_max', (string) $max]);
+    $stmt->execute([$companyId, 'daily_min_reports', (string) $dailyMin]);
 
     return ['ok' => true, 'message' => 'Monthly target berhasil diupdate.'];
 }

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
 require_admin();
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -16,6 +17,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') {
+  csrf_verify();
   $workforce_name = trim($_POST['workforce_name']);
   $action = $_POST['action'] ?? '';
   $workforce_id = (int)($_POST['workforce_id'] ?? 0);
@@ -55,8 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
   }
 }
 
-if (isset($_GET['delete_work_force'])) {
-  $workforce_id = (int)$_GET['delete_work_force'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_work_force'])) {
+  csrf_verify();
+  $workforce_id = (int)$_POST['delete_work_force'];
   try {
     $stmt = $pdo->prepare("DELETE FROM work_force WHERE workforce_id = ?");
     $stmt->execute([$workforce_id]);
@@ -125,6 +128,7 @@ function page_url($p)
     Added New Work Force
   </h2>
   <form method="POST" id="workforce-form">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="work_force">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="workforce_id" value="" id="workforce-id-input">
@@ -307,6 +311,24 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
+  function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+      ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+      [name, value]
+    ].forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function confirmDelete(id, name) {
     Swal.fire({
       title: 'Delete this record?',
@@ -319,10 +341,7 @@ function page_url($p)
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('delete_work_force', id);
-        url.searchParams.set('tab', 'work_force');
-        window.location.href = url.toString();
+        submitDelete('delete_work_force', id);
       }
     });
   }

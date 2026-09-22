@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
+require_once __DIR__ . '/../lib/csrf.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
@@ -10,6 +11,7 @@ $profileError = '';
 $profileSuccess = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $result = account_update_profile(
         $pdo,
         (int) $user_id,
@@ -143,6 +145,7 @@ include __DIR__ . '/header.php';
                 <?php endif; ?>
 
                 <form method="POST" class="space-y-6">
+                    <?= csrf_field() ?>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
