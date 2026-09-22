@@ -19,13 +19,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insert->execute([$userId, hash('sha256', $rawToken)]);
             if ($BASE_URL !== '') {
                 $url = $BASE_URL . '/reset_password.php?token=' . urlencode($rawToken);
-                send_simple_mail($email, 'Reset your Vorta password', '<p>Reset your Vorta password within one hour:</p><p><a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Reset password</a></p>');
+                $sent = send_simple_mail($email, 'Reset your Vorta password', '<p>Reset your Vorta password within one hour:</p><p><a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Reset password</a></p>');
+                if (!$sent) {
+                    $pdo->prepare("DELETE FROM account_tokens WHERE user_id = ? AND purpose = 'password_reset' AND token_hash = ?")
+                        ->execute([$userId, hash('sha256', $rawToken)]);
+                }
             } else {
                 error_log('Password reset link not sent: APP_URL is not configured.');
+                $pdo->prepare("DELETE FROM account_tokens WHERE user_id = ? AND purpose = 'password_reset' AND token_hash = ?")
+                    ->execute([$userId, hash('sha256', $rawToken)]);
             }
         }
     }
-    $message = 'If an active account exists for that email, a password reset link has been sent.';
+    $message = 'If an active account exists for that email, reset instructions may be sent. If you do not receive them, check the address or contact your administrator.';
 }
 ?>
 <!doctype html>

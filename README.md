@@ -110,9 +110,18 @@ through the authorization-checked report endpoints. Existing legacy files in
 
 ## Mail delivery
 
-Invitations and password-reset links use the server mail transport. Configure
-an SMTP/provider-backed transport for production; if mail is unavailable, the
-application reports that clearly and does not claim delivery succeeded.
+Invitations, password-reset links, and daily reminders use PHP's configured
+`mail()` transport. Set these environment values:
+
+- `MAIL_FROM_EMAIL` – required verified sender address for the deployment.
+- `MAIL_FROM_NAME` – optional display name; defaults to `Vorta Prodtracker`.
+
+The application validates the recipient and sender, logs transport failures,
+and does not claim that delivery succeeded when `mail()` fails. Password reset
+responses remain generic to avoid account enumeration, and failed reset
+delivery invalidates the generated token. PHP `mail()` is not an SMTP
+implementation; configure the server's MTA or choose an SMTP/provider library
+and credentials as a separate deployment decision.
 
 ## Notes
 - Chart.js is loaded via CDN.

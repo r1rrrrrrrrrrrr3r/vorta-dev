@@ -17,8 +17,10 @@ $stmt = $pdo->prepare("
 $stmt->execute([$today, $dailyMin]);
 $rows = $stmt->fetchAll();
 
+$sent = 0;
+$failed = 0;
 foreach ($rows as $r) {
-  $name = $r['name'];
+  $name = htmlspecialchars((string)$r['name'], ENT_QUOTES, 'UTF-8');
   $email = $r['email'];
   $c = (int)$r['c'];
   $msg = "
@@ -27,7 +29,11 @@ foreach ($rows as $r) {
     <p>The daily minimum is <strong>{$dailyMin} items</strong>. Please complete your daily report before 23:59.</p>
     <p>-  Productivity Tracker</p>
   ";
-  send_simple_mail($email, "[Reminder] Complete Your Daily Report", $msg);
+  if (send_simple_mail($email, "[Reminder] Complete Your Daily Report", $msg)) {
+    $sent++;
+  } else {
+    $failed++;
+  }
 }
 
-echo "Reminders sent: " . count($rows) . PHP_EOL;
+echo "Reminders attempted: " . count($rows) . "; sent: {$sent}; failed: {$failed}" . PHP_EOL;
