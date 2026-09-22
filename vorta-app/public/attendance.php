@@ -2,17 +2,19 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $today = date('Y-m-d');
 $current_time = date('H:i:s');
 $limit = 7;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-$stmt = $pdo->prepare("SELECT position FROM employees WHERE user_id = ?");
-$stmt->execute([$user_id]);
+$stmt = $pdo->prepare("SELECT position FROM employees WHERE user_id = ? AND company_id = ?");
+$stmt->execute([$user_id, $company_id]);
 $employee = $stmt->fetch();
 
 $isIntern = false;
@@ -42,8 +44,8 @@ if (isset($_POST['submitAbsenceReason'])) {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
-    $stmt->execute([$user_id, $absence_date]);
+    $stmt = $pdo->prepare("    SELECT * FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+    $stmt->execute([$user_id, $company_id, $absence_date]);
     $existing = $stmt->fetch();
 
     if ($existing) {
@@ -53,12 +55,12 @@ if (isset($_POST['submitAbsenceReason'])) {
         }
 
         $stmt = $pdo->prepare("UPDATE attendance SET status = ?, notes = ?, explanation = ?, updated_at = NOW()
-                              WHERE user_id = ? AND date = ?");
-        $stmt->execute([$absence_type, "Absence Reason: $absence_type", $explanation, $user_id, $absence_date]);
+                              WHERE user_id = ? AND company_id = ? AND date = ?");
+        $stmt->execute([$absence_type, "Absence Reason: $absence_type", $explanation, $user_id, $company_id, $absence_date]);
     } else {
-        $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation, created_at)
-                              VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$user_id, $absence_date, $absence_type, "Absence Reason: $absence_type", $explanation]);
+        $stmt = $pdo->prepare("INSERT INTO attendance (company_id, user_id, date, status, notes, explanation, created_at)
+                              VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$company_id, $user_id, $absence_date, $absence_type, "Absence Reason: $absence_type", $explanation]);
     }
 
     header("Location: attendance.php?success=absence_reason_submitted");
@@ -75,8 +77,8 @@ if (isset($_POST['submitLeave'])) {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT check_in FROM attendance WHERE user_id = ? AND date = ?");
-    $stmt->execute([$user_id, $today]);
+    $stmt = $pdo->prepare("    SELECT check_in FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+    $stmt->execute([$user_id, $company_id, $today]);
     $existing = $stmt->fetch();
 
     if ($existing && $existing['check_in']) {
@@ -93,14 +95,14 @@ if (isset($_POST['submitLeave'])) {
 
     $notes = "$status request";
 
-    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, status, notes, explanation)
-                          VALUES (?, ?, ?, ?, ?)
+    $stmt = $pdo->prepare("INSERT INTO attendance (company_id, user_id, date, status, notes, explanation)
+                          VALUES (?, ?, ?, ?, ?, ?)
                           ON DUPLICATE KEY UPDATE
                           status = VALUES(status),
                           notes = VALUES(notes),
                           explanation = VALUES(explanation)");
 
-    $stmt->execute([$user_id, $today, $status, $notes, $explanation]);
+    $stmt->execute([$company_id, $user_id, $today, $status, $notes, $explanation]);
 
     header("Location: attendance.php");
     exit;
@@ -113,8 +115,8 @@ if (isset($_POST['submitCheckIn'])) {
     $shift = $_POST['shift'] ?? 'WFO';
     $explanation = trim($_POST['explanation'] ?? '');
 
-    $stmt = $pdo->prepare("SELECT status FROM attendance WHERE user_id = ? AND date = ?");
-    $stmt->execute([$user_id, $today]);
+    $stmt = $pdo->prepare("    SELECT status FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+    $stmt->execute([$user_id, $company_id, $today]);
     $existing = $stmt->fetch();
 
     if ($existing && in_array($existing['status'], ['Leave', 'Sick', 'Others', 'Absent', 'Forgot'])) {
@@ -148,8 +150,8 @@ if (isset($_POST['submitCheckIn'])) {
         $save_explanation = $explanation;
     }
 
-    $stmt = $pdo->prepare("INSERT INTO attendance (user_id, date, check_in, status, location, notes, explanation)
-                          VALUES (?, ?, ?, ?, ?, ?, ?)
+    $stmt = $pdo->prepare("INSERT INTO attendance (company_id, user_id, date, check_in, status, location, notes, explanation)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                           ON DUPLICATE KEY UPDATE
                           check_in = VALUES(check_in),
                           status = VALUES(status),
@@ -158,6 +160,7 @@ if (isset($_POST['submitCheckIn'])) {
                           explanation = VALUES(explanation)");
 
     $stmt->execute([
+        $company_id,
         $user_id,
         $today,
         $current_time,
@@ -174,14 +177,14 @@ if (isset($_POST['submitCheckIn'])) {
 if (isset($_POST['check_out'])) {
     csrf_verify();
     $current_time = date('H:i:s');
-    $stmt = $pdo->prepare("UPDATE attendance SET check_out = ? WHERE user_id = ? AND date = ?");
-    $stmt->execute([$current_time, $user_id, $today]);
+    $stmt = $pdo->prepare("    UPDATE attendance SET check_out = ? WHERE user_id = ? AND company_id = ? AND date = ?");
+    $stmt->execute([$current_time, $user_id, $company_id, $today]);
     header("Location: attendance.php");
     exit;
 }
 
-$stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
-$stmt->execute([$user_id, $today]);
+$stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+$stmt->execute([$user_id, $company_id, $today]);
 $attendance = $stmt->fetch();
 
 $is_leave = $attendance && in_array($attendance['status'], ['Leave', 'Sick', 'Others', 'Absent', 'Forgot']);
@@ -194,19 +197,19 @@ $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
 
-$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM attendance WHERE user_id = ? AND date BETWEEN ? AND ?");
-$totalStmt->execute([$user_id, $start, $end]);
+$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM attendance WHERE user_id = ? AND company_id = ? AND date BETWEEN ? AND ?");
+$totalStmt->execute([$user_id, $company_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $limit));
 
 $sql = "SELECT date, check_in, check_out, status, location, notes, explanation
         FROM attendance
-        WHERE user_id = ? AND date BETWEEN ? AND ?
+        WHERE user_id = ? AND company_id = ? AND date BETWEEN ? AND ?
         ORDER BY date DESC
         LIMIT $limit OFFSET $offset";
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute([$user_id, $start, $end]);
+$stmt->execute([$user_id, $company_id, $start, $end]);
 $monthly = $stmt->fetchAll();
 
 include __DIR__ . '/header.php';

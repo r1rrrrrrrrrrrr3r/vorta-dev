@@ -5,6 +5,7 @@ require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/login_guard.php';
 require_once __DIR__ . '/../lib/tenant.php';
 
+$registered = isset($_GET['registered']) && $_GET['registered'] === '1';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   csrf_verify();
   $email = trim((string)($_POST['email'] ?? ''));
@@ -70,6 +71,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <?php echo htmlspecialchars($error) ?>
         </div>
       <?php endif; ?>
+      <?php if ($registered): ?>
+        <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
+          Your company workspace is ready. Sign in with the administrator account you just created.
+        </div>
+      <?php endif; ?>
 
       <form method="post" class="space-y-6">
         <?= csrf_field() ?>
@@ -94,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </button>
         </div>
       </form>
+      <p class="mt-4 text-center text-sm"><a href="forgot_password.php" class="text-gray-500 hover:text-indigo-600">Forgot your password?</a></p>
+      <p class="mt-4 text-center text-sm"><a href="register.php" class="font-medium text-indigo-600 hover:text-indigo-700">Create a company account</a></p>
     </div>
   </div>
 </body>

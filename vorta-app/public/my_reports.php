@@ -2,9 +2,11 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $detailOwnerId = (int)$user_id;
 
 $detailSelf = basename(__FILE__);
@@ -19,9 +21,9 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
     $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
             FROM production_reports pr
             LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-            JOIN users u ON u.user_id = pr.user_id
-            WHERE pr.report_id = ?";
-    $params = [$reportId];
+            JOIN users u ON u.user_id = pr.user_id AND u.company_id = pr.company_id
+            WHERE pr.report_id = ? AND pr.company_id = ?";
+    $params = [$reportId, $company_id];
     if ($ownerId !== null) {
         $sql .= " AND pr.user_id = ?";
         $params[] = $ownerId;
@@ -164,8 +166,8 @@ $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 $monthlyTarget = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
-$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
-$totalStmt->execute([$user_id, $start, $end]);
+$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?");
+$totalStmt->execute([$user_id, $company_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $limit));
 
@@ -173,19 +175,19 @@ $stmt = $pdo->prepare("SELECT
         pr.*,
         wf.workforce_name
     FROM production_reports pr
-    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-    WHERE pr.user_id = ? 
+    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id AND wf.company_id = pr.company_id
+    WHERE pr.user_id = ? AND pr.company_id = ?
       AND pr.report_date BETWEEN ? AND ?
     ORDER BY pr.report_date DESC, pr.report_id DESC
     LIMIT $limit OFFSET $offset");
-$stmt->execute([$user_id, $start, $end]);
+$stmt->execute([$user_id, $company_id, $start, $end]);
 $rows = $stmt->fetchAll();
 
 $stmt2 = $pdo->prepare("SELECT DATE(report_date) d, COUNT(*) c 
                         FROM production_reports 
-                        WHERE user_id = ? AND report_date BETWEEN ? AND ? 
+                        WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?
                         GROUP BY DATE(report_date)");
-$stmt2->execute([$user_id, $start, $end]);
+$stmt2->execute([$user_id, $company_id, $start, $end]);
 $daily = $stmt2->fetchAll();
 
 $labels = [];

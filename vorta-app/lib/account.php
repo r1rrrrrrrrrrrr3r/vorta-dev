@@ -74,15 +74,18 @@ function account_update_profile(
     $pdo->prepare("UPDATE users SET email = ? WHERE user_id = ?")
         ->execute([$email, $userId]);
 
-    $hasEmployee = $pdo->prepare("SELECT user_id FROM employees WHERE user_id = ?");
-    $hasEmployee->execute([$userId]);
+    $hasEmployee = $pdo->prepare("SELECT user_id FROM employees WHERE user_id = ? AND company_id = (SELECT company_id FROM users WHERE user_id = ?)");
+    $hasEmployee->execute([$userId, $userId]);
 
     if ($hasEmployee->fetch()) {
-        $pdo->prepare("UPDATE employees SET name = ?, phone = ? WHERE user_id = ?")
-            ->execute([$name, $phone, $userId]);
+        $pdo->prepare("UPDATE employees SET name = ?, phone = ? WHERE user_id = ? AND company_id = (SELECT company_id FROM users WHERE user_id = ?)")
+            ->execute([$name, $phone, $userId, $userId]);
     } else {
-        $pdo->prepare("INSERT INTO employees (user_id, name, phone) VALUES (?, ?, ?)")
-            ->execute([$userId, $name, $phone]);
+        $companyStmt = $pdo->prepare("SELECT company_id FROM users WHERE user_id = ?");
+        $companyStmt->execute([$userId]);
+        $companyId = (int)$companyStmt->fetchColumn();
+        $pdo->prepare("INSERT INTO employees (company_id, user_id, name, phone) VALUES (?, ?, ?, ?)")
+            ->execute([$companyId, $userId, $name, $phone]);
     }
 
     return ['ok' => true, 'message' => 'Profile updated successfully.'];

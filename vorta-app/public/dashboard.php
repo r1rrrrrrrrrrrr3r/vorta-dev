@@ -10,6 +10,17 @@ $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
 $target = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
+$setup = [];
+if (($_SESSION['user']['role'] ?? '') === 'admin') {
+    $countStmt = $pdo->prepare("SELECT
+        (SELECT COUNT(*) FROM users WHERE company_id = ?) AS users,
+        (SELECT COUNT(*) FROM employees WHERE company_id = ?) AS employees,
+        (SELECT COUNT(*) FROM work_force WHERE company_id = ?) AS workforces,
+        (SELECT COUNT(*) FROM company_invitations WHERE company_id = ? AND accepted_at IS NULL AND expires_at > NOW()) AS pending_invites,
+        (SELECT COUNT(*) FROM app_settings WHERE company_id = ? AND setting_key IN ('monthly_target_min', 'monthly_target_max', 'daily_min_reports')) AS configured_settings");
+    $countStmt->execute([$company_id, $company_id, $company_id, $company_id, $company_id]);
+    $setup = $countStmt->fetch() ?: [];
+}
 $end = date('Y-m-t', strtotime($start));
 $stmt = $pdo->prepare("
   SELECT u.user_id, u.name, u.role,
@@ -163,6 +174,53 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
       </form>
     </div>
   </header>
+
+  <style>
+    .vorta-setup { display:flex; align-items:flex-start; gap:16px; margin-bottom:24px; padding:20px; background:var(--surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:16px; box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06),0 6px 18px -8px rgba(0,0,0,.12)); }
+    .vorta-setup__icon { flex:0 0 44px; width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(99,102,241,.12); }
+    .vorta-setup__icon svg { display:block; color:#4f46e5; }
+    .vorta-setup__body { min-width:0; flex:1; }
+    .vorta-setup__title { margin:0; font-size:20px; font-weight:700; color:var(--text,#1f2937); }
+    .vorta-setup__subtitle { margin:4px 0 0; font-size:14px; color:var(--text-muted,#6b7280); }
+    .vorta-setup__steps { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .vorta-step { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px; font-size:14px; font-weight:600; text-decoration:none; border:1px solid var(--border,#e5e7eb); color:var(--text,#1f2937); background:var(--surface,#fff); transition:background .15s ease,border-color .15s ease; }
+    .vorta-step:hover { background:var(--surface-3,#f3f4f6); }
+    .vorta-step__num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:999px; font-size:11px; font-weight:700; background:var(--surface-3,#f3f4f6); color:var(--text-muted,#6b7280); }
+    .vorta-step--primary { background:#4f46e5; border-color:#4f46e5; color:#fff; }
+    .vorta-step--primary:hover { background:#4338ca; }
+    .vorta-step--primary .vorta-step__num { background:rgba(255,255,255,.25); color:#fff; }
+    .vorta-step--complete { border-color:#bbf7d0; color:#166534; background:#f0fdf4; }
+    .vorta-step--complete:hover { background:#dcfce7; }
+    .vorta-step--complete .vorta-step__num { background:#dcfce7; color:#15803d; }
+    @media (max-width:480px) { .vorta-setup { padding:16px; } .vorta-setup__icon { display:none; } .vorta-step { padding:9px 12px; } }
+  </style>
+  <?php
+    $setupHasTeam = !empty($setup) && ((int)$setup['users'] > 1 || (int)$setup['pending_invites'] > 0);
+    $setupHasEmployees = !empty($setup) && (int)$setup['employees'] > 0;
+    $setupHasTargets = !empty($setup) && (int)$setup['configured_settings'] >= 3;
+  ?>
+  <?php if (!empty($setup) && (!$setupHasTeam || !$setupHasEmployees || !$setupHasTargets)): ?>
+    <section class="vorta-setup">
+      <div class="vorta-setup__icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      </div>
+      <div class="vorta-setup__body">
+        <h2 class="vorta-setup__title">Finish setting up your workspace</h2>
+        <p class="vorta-setup__subtitle">Invite your team, assign employees, and set targets before collecting reports.</p>
+        <div class="vorta-setup__steps">
+          <a href="admin_master_data.php?tab=users" class="vorta-step <?= $setupHasTeam ? 'vorta-step--complete' : 'vorta-step--primary' ?>">
+            <span class="vorta-step__num"><?= $setupHasTeam ? '✓' : '1' ?></span> Invite users<?php if ((int)($setup['pending_invites'] ?? 0) > 0): ?> (<?= (int)$setup['pending_invites'] ?> pending)<?php endif; ?>
+          </a>
+          <a href="admin_master_data.php?tab=employees" class="vorta-step <?= $setupHasEmployees ? 'vorta-step--complete' : '' ?>">
+            <span class="vorta-step__num"><?= $setupHasEmployees ? '✓' : '2' ?></span> Assign employees<?php if ($setupHasEmployees): ?> (<?= (int)$setup['employees'] ?>)<?php endif; ?>
+          </a>
+          <a href="admin_master_data.php?tab=settings" class="vorta-step <?= $setupHasTargets ? 'vorta-step--complete' : '' ?>">
+            <span class="vorta-step__num"><?= $setupHasTargets ? '✓' : '3' ?></span> Set targets
+          </a>
+        </div>
+      </div>
+    </section>
+  <?php endif; ?>
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="stat-card">

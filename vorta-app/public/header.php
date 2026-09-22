@@ -25,6 +25,9 @@ if (isset($_SESSION['user'])) {
     $navItems[] = ['href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => $icons['grid']];
 
     if (in_array($_SESSION['user']['role'] ?? '', ['admin', 'platform_admin'], true)) {
+        if (($_SESSION['user']['role'] ?? '') === 'platform_admin') {
+            $navItems[] = ['href' => 'platform_companies.php', 'label' => 'Companies', 'icon' => $icons['database']];
+        }
         $navItems[] = ['href' => 'admin_reports.php',        'label' => 'All Reports',       'icon' => $icons['docs']];
         $navItems[] = ['href' => 'admin_attendance.php',     'label' => 'Attendance Report', 'icon' => $icons['calendar']];
         $navItems[] = ['href' => 'admin_master_data.php',    'label' => 'Master Data',       'icon' => $icons['database']];

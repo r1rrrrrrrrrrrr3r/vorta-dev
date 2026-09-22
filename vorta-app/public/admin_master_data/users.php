@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/account.php';
 require_once __DIR__ . '/../../lib/tenant.php';
 require_once __DIR__ . '/../../lib/audit.php';
+require_once __DIR__ . '/../../lib/config.php';
+require_once __DIR__ . '/../../lib/mailer.php';
 require_admin();
 $company_id = current_company_id();
 
@@ -23,6 +25,122 @@ if (isset($_SESSION['error'])) {
   unset($_SESSION['error']);
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'user_invite') {
+  csrf_verify();
+  $email = strtolower(trim((string)($_POST['invite_email'] ?? '')));
+  $role = (string)($_POST['invite_role'] ?? 'staff');
+
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $_SESSION['error'] = 'Enter a valid email address.';
+  } elseif (!in_array($role, ['admin', 'manager', 'staff'], true)) {
+    $_SESSION['error'] = 'Choose a valid invitation role.';
+  } else {
+    try {
+      $existing = $pdo->prepare('SELECT user_id FROM users WHERE email = ? LIMIT 1');
+      $existing->execute([$email]);
+      if ($existing->fetch()) {
+        $_SESSION['error'] = 'An account already exists for this email.';
+      } else {
+        $pdo->beginTransaction();
+        $remove = $pdo->prepare('DELETE FROM company_invitations WHERE company_id = ? AND email = ? AND accepted_at IS NULL');
+        $remove->execute([$company_id, $email]);
+
+        $rawToken = bin2hex(random_bytes(32));
+        $invite = $pdo->prepare('
+          INSERT INTO company_invitations
+            (company_id, email, role, token_hash, expires_at, created_by)
+          VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY), ?)
+        ');
+        $invite->execute([
+          $company_id,
+          $email,
+          $role,
+          hash('sha256', $rawToken),
+          (int)($_SESSION['user']['user_id'] ?? 0)
+        ]);
+        $pdo->commit();
+
+        $inviteUrl = rtrim($BASE_URL, '/') . '/accept_invite.php?token=' . urlencode($rawToken);
+        $companyName = htmlspecialchars((string)($_SESSION['company']['name'] ?? 'your company'), ENT_QUOTES, 'UTF-8');
+        $safeUrl = htmlspecialchars($inviteUrl, ENT_QUOTES, 'UTF-8');
+        $mailSent = send_simple_mail(
+          $email,
+          'You have been invited to Vorta Prodtracker',
+          '<p>You have been invited to join ' . $companyName . ' on Vorta Prodtracker.</p><p><a href="' . $safeUrl . '">Accept your invitation</a></p><p>This link expires in 7 days.</p>'
+        );
+        $_SESSION['success'] = $mailSent
+          ? 'Invitation created and emailed. The link is also available below.'
+          : 'Invitation created, but email delivery is unavailable. Copy the link below and send it to the employee.';
+        $_SESSION['invite_url'] = $inviteUrl;
+        audit_log($pdo, 'user.invited', 'company_invitations', $pdo->lastInsertId(), ['email' => $email, 'role' => $role]);
+      }
+
+      if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revoke_invite'])) {
+        csrf_verify();
+        $invitationId = (int)$_POST['revoke_invite'];
+        $stmt = $pdo->prepare('DELETE FROM company_invitations WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL');
+        $stmt->execute([$invitationId, $company_id]);
+        $_SESSION[$stmt->rowCount() ? 'success' : 'error'] = $stmt->rowCount() ? 'Invitation revoked.' : 'Invitation not found.';
+        header('Location: admin_master_data.php?tab=users');
+        exit;
+      }
+
+      if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_invite'])) {
+        csrf_verify();
+        $invitationId = (int)$_POST['resend_invite'];
+        $pendingStmt = $pdo->prepare('
+          SELECT email, role
+          FROM company_invitations
+          WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL
+          LIMIT 1
+        ');
+        $pendingStmt->execute([$invitationId, $company_id]);
+        $pending = $pendingStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pending) {
+          $_SESSION['error'] = 'Invitation not found.';
+        } else {
+          try {
+            $rawToken = bin2hex(random_bytes(32));
+            $update = $pdo->prepare('
+              UPDATE company_invitations
+              SET token_hash = ?, expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY), created_at = CURRENT_TIMESTAMP
+              WHERE invitation_id = ? AND company_id = ? AND accepted_at IS NULL
+            ');
+            $update->execute([hash('sha256', $rawToken), $invitationId, $company_id]);
+            $inviteUrl = rtrim($BASE_URL, '/') . '/accept_invite.php?token=' . urlencode($rawToken);
+            $companyName = htmlspecialchars((string)($_SESSION['company']['name'] ?? 'your company'), ENT_QUOTES, 'UTF-8');
+            $safeUrl = htmlspecialchars($inviteUrl, ENT_QUOTES, 'UTF-8');
+            $mailSent = send_simple_mail(
+              $pending['email'],
+              'Reminder: you have been invited to Vorta Prodtracker',
+              '<p>Your invitation to join ' . $companyName . ' is still waiting for you.</p><p><a href="' . $safeUrl . '">Accept your invitation</a></p><p>This link expires in 7 days.</p>'
+            );
+            $_SESSION['success'] = $mailSent
+              ? 'Invitation resent by email.'
+              : 'Invitation renewed, but email delivery is unavailable. Copy the new link below.';
+            $_SESSION['invite_url'] = $inviteUrl;
+            audit_log($pdo, 'user.invite_resent', 'company_invitations', $invitationId, ['email' => $pending['email']]);
+          } catch (Throwable $e) {
+            $_SESSION['error'] = 'Failed to resend the invitation.';
+          }
+        }
+        header('Location: admin_master_data.php?tab=users');
+        exit;
+      }
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      $_SESSION['error'] = 'Failed to create the invitation.';
+    }
+  }
+
+  $redirect = 'admin_master_data.php?tab=users';
+  echo "<script> window.location.href = '$redirect'; </script>";
+  exit;
+}
+
 $search = trim($_GET['search'] ?? '');
 $perPage = 10;
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -36,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
   $user_id = (int)($_POST['user_id'] ?? 0);
   $role = $_POST['role'] ?? 'staff';
 
-  if (!in_array($role, ['staff', 'admin'])) {
+  if (!in_array($role, ['staff', 'manager', 'admin'], true)) {
     $role = 'staff';
   }
 
@@ -64,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
         }
       } elseif ($action === 'update') {
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
-        $check->execute([$email, $user_id, $company_id]);
+        $check->execute([$email, $user_id]);
         if ($check->fetch()) {
           $_SESSION['error'] = "Email is already in use by another user.";
         } else {
@@ -150,6 +268,18 @@ $stmt->bindValue($index, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$pendingInvitesStmt = $pdo->prepare('
+  SELECT invitation_id, email, role, expires_at
+  FROM company_invitations
+  WHERE company_id = ? AND accepted_at IS NULL AND expires_at > NOW()
+  ORDER BY created_at DESC
+  LIMIT 10
+');
+$pendingInvitesStmt->execute([$company_id]);
+$pendingInvites = $pendingInvitesStmt->fetchAll(PDO::FETCH_ASSOC);
+$inviteUrl = $_SESSION['invite_url'] ?? '';
+unset($_SESSION['invite_url']);
+
 function page_url($p)
 {
   $q = $_GET;
@@ -167,6 +297,93 @@ function page_url($p)
   <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded">
     <?= htmlspecialchars($error) ?>
   </div>
+<?php endif; ?>
+
+<?php if ($inviteUrl): ?>
+  <div class="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+    <p class="font-semibold">Invitation link ready</p>
+    <p class="mt-1">Send this one-time link to the employee. It expires in 7 days.</p>
+    <div class="mt-3 flex gap-2">
+      <input id="invite-url" type="text" readonly value="<?= htmlspecialchars($inviteUrl, ENT_QUOTES, 'UTF-8') ?>"
+        class="min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-indigo-800">
+      <button type="button" id="copy-invite" class="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Copy</button>
+    </div>
+  </div>
+<?php endif; ?>
+
+<style>
+  .vorta-invite { margin-bottom:32px; padding:20px; background:var(--surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:16px; box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06),0 6px 18px -8px rgba(0,0,0,.12)); }
+  .vorta-invite__title { margin:0; font-size:18px; font-weight:700; color:var(--text,#1f2937); }
+  .vorta-invite__subtitle { margin:4px 0 0; font-size:14px; color:var(--text-muted,#6b7280); }
+  .vorta-invite__form { display:flex; flex-wrap:wrap; gap:12px; margin-top:18px; }
+  .vorta-invite__field { flex:1 1 240px; min-width:0; }
+  .vorta-invite__field input, .vorta-invite__field select { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border,#e5e7eb); border-radius:10px; background:var(--surface,#fff); color:var(--text,#1f2937); font-size:14px; }
+  .vorta-invite__submit { padding:10px 18px; border:0; border-radius:10px; background:#4f46e5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+  .vorta-invite__submit:hover { background:#4338ca; }
+  .vorta-invite__pending { margin-top:18px; padding-top:16px; border-top:1px solid var(--border,#e5e7eb); }
+  .vorta-invite__pending-title { margin:0 0 8px; font-size:13px; font-weight:700; color:var(--text,#1f2937); }
+  .vorta-invite__pending-list { display:flex; flex-wrap:wrap; gap:8px; }
+  .vorta-invite__pending-item { padding:7px 10px; border-radius:8px; background:var(--surface-3,#f3f4f6); color:var(--text-muted,#6b7280); font-size:12px; }
+</style>
+
+<section class="vorta-invite">
+  <h2 class="vorta-invite__title">Invite employees</h2>
+  <p class="vorta-invite__subtitle">Create a secure sign-up link so employees can set their own password.</p>
+  <form method="POST" class="vorta-invite__form">
+    <?= csrf_field() ?>
+    <input type="hidden" name="entity" value="user_invite">
+    <label class="vorta-invite__field">
+      <span class="block text-sm font-medium text-gray-700 mb-1">Employee email</span>
+      <input type="email" name="invite_email" placeholder="employee@example.com" required>
+    </label>
+    <label class="vorta-invite__field">
+      <span class="block text-sm font-medium text-gray-700 mb-1">Role</span>
+      <select name="invite_role">
+        <option value="staff">Staff</option>
+        <option value="manager">Manager</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <div class="flex items-end">
+      <button type="submit" class="vorta-invite__submit">Create invite</button>
+    </div>
+  </form>
+  <?php if ($pendingInvites): ?>
+    <div class="vorta-invite__pending">
+      <p class="vorta-invite__pending-title">Pending invitations</p>
+      <div class="vorta-invite__pending-list">
+        <?php foreach ($pendingInvites as $pending): ?>
+          <span class="vorta-invite__pending-item">
+            <?= htmlspecialchars($pending['email']) ?> · <?= htmlspecialchars(ucfirst($pending['role'])) ?> · expires <?= htmlspecialchars(date('M j, Y H:i', strtotime($pending['expires_at']))) ?>
+            <form method="POST" style="display:inline;margin-left:8px">
+              <?= csrf_field() ?>
+              <button type="submit" name="resend_invite" value="<?= (int)$pending['invitation_id'] ?>" style="border:0;background:none;color:#4f46e5;font-size:12px;cursor:pointer">Resend</button>
+            </form>
+            <form method="POST" style="display:inline;margin-left:8px">
+              <?= csrf_field() ?>
+              <button type="submit" name="revoke_invite" value="<?= (int)$pending['invitation_id'] ?>" style="border:0;background:none;color:#b91c1c;font-size:12px;cursor:pointer">Revoke</button>
+            </form>
+          </span>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+</section>
+<?php if ($inviteUrl): ?>
+  <script>
+    document.getElementById('copy-invite')?.addEventListener('click', async function () {
+      const input = document.getElementById('invite-url');
+      try {
+        await navigator.clipboard.writeText(input.value);
+        this.textContent = 'Copied';
+        setTimeout(() => { this.textContent = 'Copy'; }, 1800);
+      } catch (error) {
+        input.select();
+        document.execCommand('copy');
+        this.textContent = 'Copied';
+      }
+    });
+  </script>
 <?php endif; ?>
 
 <div id="user-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
@@ -207,6 +424,7 @@ function page_url($p)
         <select name="role" id="user-role"
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
           <option value="staff">Staff</option>
+          <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
       </div>
