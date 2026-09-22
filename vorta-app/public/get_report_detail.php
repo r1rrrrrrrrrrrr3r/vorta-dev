@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $report_id = $_GET['id'] ?? 0;
 
@@ -9,10 +11,10 @@ $stmt = $pdo->prepare("
     SELECT pr.*, u.name, wf.workforce_name
     FROM production_reports pr
     LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-    JOIN users u ON u.user_id = pr.user_id
-    WHERE pr.report_id = ?
+    JOIN users u ON u.user_id = pr.user_id AND u.company_id = pr.company_id
+    WHERE pr.report_id = ? AND pr.company_id = ?
 ");
-$stmt->execute([$report_id]);
+$stmt->execute([$report_id, $company_id]);
 $row = $stmt->fetch();
 
 if (!$row) {

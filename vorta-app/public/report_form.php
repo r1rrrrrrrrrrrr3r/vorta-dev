@@ -3,7 +3,9 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = $_SESSION['user']['user_id'];
 $monthlyTarget = settings_get_monthly_target($pdo);
@@ -18,10 +20,12 @@ if (!$employee) {
 
 $employee_id = $employee['employee_id'];
 
-$stmt = $pdo->query("SELECT workforce_id, workforce_name FROM work_force ORDER BY workforce_name");
+$stmt = $pdo->prepare("SELECT workforce_id, workforce_name FROM work_force WHERE company_id = ? ORDER BY workforce_name");
+$stmt->execute([$company_id]);
 $work_forces = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt = $pdo->query("SELECT job_type_id, name FROM job_type ORDER BY name");
+$stmt = $pdo->prepare("SELECT job_type_id, name FROM job_type WHERE company_id = ? ORDER BY name");
+$stmt->execute([$company_id]);
 $job_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/header.php';

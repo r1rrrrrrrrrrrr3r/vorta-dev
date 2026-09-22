@@ -3,7 +3,9 @@ require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
 require_once __DIR__ . '/../../lib/account.php';
+require_once __DIR__ . '/../../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $success = '';
 $error = '';
@@ -48,28 +50,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
   } else {
     try {
       if ($action === 'create') {
-        $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
-        $check->execute([$email]);
+        $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND company_id = ?");
+        $check->execute([$email, $company_id]);
         if ($check->fetch()) {
           $_SESSION['error'] = "Email is already in use.";
         } else {
           $pass_hash = password_hash($password, PASSWORD_DEFAULT);
-          $stmt = $pdo->prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)");
-          $stmt->execute([$name, $email, $pass_hash, $role]);
+          $stmt = $pdo->prepare("INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)");
+          $stmt->execute([$company_id, $name, $email, $pass_hash, $role]);
           $_SESSION['success'] = "User added successfully.";
         }
       } elseif ($action === 'update') {
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
-        $check->execute([$email, $user_id]);
+        $check->execute([$email, $user_id, $company_id]);
         if ($check->fetch()) {
           $_SESSION['error'] = "Email is already in use by another user.";
         } else {
-          $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ?");
-          $stmt->execute([$name, $email, $role, $user_id]);
+          $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ? AND company_id = ?");
+          $stmt->execute([$name, $email, $role, $user_id, $company_id]);
           if (!empty($password)) {
             $pass_hash = password_hash($password, PASSWORD_DEFAULT);
-            $pstmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ?");
-            $pstmt->execute([$pass_hash, $user_id]);
+            $pstmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE user_id = ? AND company_id = ?");
+            $pstmt->execute([$pass_hash, $user_id, $company_id]);
           }
           $_SESSION['success'] = "User updated successfully.";
         }
@@ -95,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     if ($user_id === (int)($_SESSION['user']['user_id'] ?? 0)) {
       $_SESSION['error'] = "You cannot delete your own account.";
     } else {
-      $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
-      $stmt->execute([$user_id]);
+      $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ? AND company_id = ?");
+      $stmt->execute([$user_id, $company_id]);
 
       if ($stmt->rowCount()) {
         $_SESSION['success'] = "User deleted successfully.";
@@ -122,6 +124,9 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM users $whereSql");
 foreach ($params as $i => $val) {
   $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);

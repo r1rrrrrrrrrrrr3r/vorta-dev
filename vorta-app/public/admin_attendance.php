@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $recapType = $_GET['recap_type'] ?? 'daily';
 $date = $_GET['date'] ?? date('Y-m-d');
@@ -45,8 +47,8 @@ $limitDaily = 10;
 $dailyPage = isset($_GET['daily_page']) ? max(1, (int)$_GET['daily_page']) : 1;
 $dailyOffset = ($dailyPage - 1) * $limitDaily;
 
-$sqlCountDaily = "SELECT COUNT(*) FROM attendance a WHERE a.date = ?";
-$paramsDaily = [$date];
+$sqlCountDaily = "SELECT COUNT(*) FROM attendance a WHERE a.company_id = ? AND a.date = ?";
+$paramsDaily = [$company_id, $date];
 if (!empty($notesFilter)) {
   $sqlCountDaily .= " AND a.notes = ?";
   $paramsDaily[] = $notesFilter;
@@ -66,9 +68,9 @@ $sqlDaily = "
     SELECT a.*, u.name, u.email
     FROM attendance a
     JOIN users u ON a.user_id = u.user_id
-    WHERE a.date = ?
+    WHERE a.company_id = ? AND u.company_id = a.company_id AND a.date = ?
 ";
-$paramsDaily = [$date];
+$paramsDaily = [$company_id, $date];
 if (!empty($notesFilter)) {
   $sqlDaily .= " AND a.notes = ?";
   $paramsDaily[] = $notesFilter;
@@ -87,11 +89,12 @@ $limitMonthly = 10;
 $monthlyPage = isset($_GET['monthly_page']) ? max(1, (int)$_GET['monthly_page']) : 1;
 $monthlyOffset = ($monthlyPage - 1) * $limitMonthly;
 
-$usersStmt = $pdo->query("SELECT user_id, name FROM users WHERE is_active = 1 ORDER BY name");
+$usersStmt = $pdo->prepare("SELECT user_id, name FROM users WHERE company_id = ? AND is_active = 1 ORDER BY name");
+$usersStmt->execute([$company_id]);
 $users = $usersStmt->fetchAll();
 
-$sqlCountMonthly = "SELECT COUNT(*) FROM users WHERE is_active = 1";
-$paramsMonthly = [];
+$sqlCountMonthly = "SELECT COUNT(*) FROM users WHERE company_id = ? AND is_active = 1";
+$paramsMonthly = [$company_id];
 if (!empty($userFilter)) {
   $sqlCountMonthly .= " AND user_id = ?";
   $paramsMonthly[] = $userFilter;
@@ -131,10 +134,10 @@ $sqlMonthly = "
            COUNT(a.attendance_id) as total_records
     FROM users u
     LEFT JOIN attendance a ON a.user_id = u.user_id AND a.date BETWEEN ? AND ?
-    WHERE u.is_active = 1
+    WHERE u.company_id = ? AND u.is_active = 1
 ";
 
-$paramsMonthlyQuery = [$start, $end];
+$paramsMonthlyQuery = [$start, $end, $company_id];
 
 if (!empty($userFilter)) {
   $sqlMonthly .= " AND u.user_id = ?";
@@ -166,11 +169,11 @@ $sqlTotalMonthly = "
            SUM(CASE WHEN a.status = 'Leave' THEN 1 ELSE 0 END) as total_leave,
            SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as total_sick
     FROM attendance a
-    WHERE a.date BETWEEN ? AND ?
+    WHERE a.company_id = ? AND a.date BETWEEN ? AND ?
 ";
 
 $totalStmt = $pdo->prepare($sqlTotalMonthly);
-$totalStmt->execute([$start, $end]);
+$totalStmt->execute([$company_id, $start, $end]);
 $monthlyTotals = $totalStmt->fetch();
 
 include __DIR__ . '/header.php';

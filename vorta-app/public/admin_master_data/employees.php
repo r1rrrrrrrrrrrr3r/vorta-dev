@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -61,19 +63,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
     try {
       if ($action === 'create') {
 
-        $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-        $check->execute([$user_id]);
+        $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+        $check->execute([$user_id, $company_id]);
         if ($check->fetch()) {
           $_SESSION['error'] = "This user is already an employee.";
         } else {
-          $stmt = $pdo->prepare("INSERT INTO employees (user_id, name, position, phone) VALUES (?, ?, ?, ?)");
-          $stmt->execute([$user_id, $name, $position, $phone]);
+          $stmt = $pdo->prepare("INSERT INTO employees (company_id, user_id, name, position, phone) VALUES (?, ?, ?, ?, ?)");
+          $stmt->execute([$company_id, $user_id, $name, $position, $phone]);
           $_SESSION['success'] = "Employee added successfully.";
         }
       } elseif ($action === 'update') {
 
-        $check = $pdo->prepare("SELECT user_id FROM employees WHERE employee_id = ?");
-        $check->execute([$employee_id]);
+        $check = $pdo->prepare("SELECT user_id FROM employees WHERE employee_id = ? AND company_id = ?");
+        $check->execute([$employee_id, $company_id]);
         $existing = $check->fetch();
 
         if (!$existing) {
@@ -81,16 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         } else {
 
           if ($existing['user_id'] != $user_id) {
-            $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-            $check_user->execute([$user_id]);
+            $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+            $check_user->execute([$user_id, $company_id]);
             if ($check_user->fetch()) {
               $_SESSION['error'] = "This user is already linked to another employee.";
             }
           }
 
           if (!isset($_SESSION['error'])) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ?");
-            $stmt->execute([$name, $position, $phone, $employee_id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ? AND company_id = ?");
+            $stmt->execute([$name, $position, $phone, $employee_id, $company_id]);
             $_SESSION['success'] = "Employee updated successfully.";
           }
         }
@@ -113,8 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_emp'])) {
   csrf_verify();
   $employee_id = (int)$_POST['delete_emp'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ?");
-    $stmt->execute([$employee_id]);
+    $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ? AND company_id = ?");
+    $stmt->execute([$employee_id, $company_id]);
     $_SESSION['success'] = "Employee deleted successfully.";
   } catch (PDOException $e) {
     $_SESSION['error'] = "Failed to delete: " . $e->getMessage();
@@ -134,6 +136,9 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "e.company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalSql = "SELECT COUNT(*) AS cnt FROM employees e $whereSql";
 $totalStmt = $pdo->prepare($totalSql);
 foreach ($params as $i => $val) {
@@ -146,7 +151,7 @@ $totalPages = (int)ceil($totalEmployees / $perPage);
 $sql = "
     SELECT e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
     FROM employees e 
-    JOIN users u ON u.user_id = e.user_id 
+    JOIN users u ON u.user_id = e.user_id AND u.company_id = e.company_id
     $whereSql 
     ORDER BY e.employee_id ASC 
     LIMIT ? OFFSET ?
@@ -167,7 +172,8 @@ $allUsersStmt = $pdo->query("
         u.name,
         e.employee_id IS NOT NULL as is_employee
     FROM users u
-    LEFT JOIN employees e ON u.user_id = e.user_id
+    LEFT JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    WHERE u.company_id = $company_id
     ORDER BY u.name
 ");
 $all_users = $allUsersStmt->fetchAll(PDO::FETCH_ASSOC);

@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
+$company_id = current_company_id();
 
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
@@ -14,12 +16,12 @@ $stmt = $pdo->prepare("
          COALESCE(SUM(pr.report_date BETWEEN ? AND ?), 0) as dummy,
          COUNT(pr.report_id) as total
   FROM users u
-  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date BETWEEN ? AND ?
-  WHERE u.is_active = 1
+  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.company_id = u.company_id AND pr.report_date BETWEEN ? AND ?
+  WHERE u.is_active = 1 AND u.company_id = ?
   GROUP BY u.user_id
   ORDER BY total DESC, u.name
 ");
-$stmt->execute([$start, $end, $start, $end]);
+$stmt->execute([$start, $end, $start, $end, $company_id]);
 $users = $stmt->fetchAll();
 
 $totalStaff = count($users);
@@ -28,8 +30,8 @@ $onTrackStaff = count(array_filter($users, fn($u) => (int)$u['total'] >= $target
 $avgPerStaff = $totalStaff > 0 ? round($totalReportsMonth / $totalStaff, 1) : 0;
 $onTrackPct = $totalStaff > 0 ? round(($onTrackStaff / $totalStaff) * 100) : 0;
 
-$types = $pdo->prepare("SELECT job_type, COUNT(*) c FROM production_reports WHERE report_date BETWEEN ? AND ? GROUP BY job_type ORDER BY c DESC");
-$types->execute([$start, $end]);
+$types = $pdo->prepare("SELECT job_type, COUNT(*) c FROM production_reports WHERE company_id = ? AND report_date BETWEEN ? AND ? GROUP BY job_type ORDER BY c DESC");
+$types->execute([$company_id, $start, $end]);
 $typeRows = $types->fetchAll();
 $typeTotal = array_sum(array_column($typeRows, 'c'));
 

@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -26,12 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     } else {
         try {
             if ($action === 'create') {
-                $stmt = $pdo->prepare("INSERT INTO job_type (name) VALUES (?)");
-                $stmt->execute([$name]);
+                $stmt = $pdo->prepare("INSERT INTO job_type (company_id, name) VALUES (?, ?)");
+                $stmt->execute([$company_id, $name]);
                 $_SESSION['success'] = "Job type added successfully.";
             } elseif ($action === 'update') {
-                $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ?");
-                $stmt->execute([$name, $job_type_id]);
+                $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ? AND company_id = ?");
+                $stmt->execute([$name, $job_type_id, $company_id]);
                 if ($stmt->rowCount()) {
                     $_SESSION['success'] = "Job type updated successfully.";
                 } else {
@@ -60,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job_type'])) {
     csrf_verify();
     $job_type_id = (int)$_POST['delete_job_type'];
     try {
-        $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ?");
-        $stmt->execute([$job_type_id]);
+        $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ? AND company_id = ?");
+        $stmt->execute([$job_type_id, $company_id]);
 
         if ($stmt->rowCount()) {
             $_SESSION['success'] = "Job type deleted successfully.";
@@ -86,6 +88,9 @@ if ($search) {
     $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM job_type $whereSql");
 foreach ($params as $i => $val) {
     $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);

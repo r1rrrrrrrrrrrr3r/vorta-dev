@@ -2,7 +2,12 @@
 
 function current_company_id(): int
 {
-    return (int)($_SESSION['user']['company_id'] ?? 0);
+    $id = (int)($_SESSION['user']['company_id'] ?? 0);
+    if ($id <= 0) {
+        http_response_code(403);
+        exit('Company context required.');
+    }
+    return $id;
 }
 
 function current_role(): string

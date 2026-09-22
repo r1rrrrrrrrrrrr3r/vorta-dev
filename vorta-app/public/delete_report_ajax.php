@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 header('Content-Type: application/json');
@@ -13,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 csrf_verify();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $report_id = $_POST['report_id'] ?? null;
 
 if (!$report_id) {
@@ -20,8 +22,8 @@ if (!$report_id) {
     exit;
 }
 
-$stmt = $pdo->prepare("SELECT user_id FROM production_reports WHERE report_id = ?");
-$stmt->execute([$report_id]);
+$stmt = $pdo->prepare("SELECT user_id FROM production_reports WHERE report_id = ? AND company_id = ?");
+$stmt->execute([$report_id, $company_id]);
 $report = $stmt->fetch();
 
 if (!$report) {
@@ -34,8 +36,8 @@ if ($report['user_id'] != $user_id) {
     exit;
 }
 
-$stmt = $pdo->prepare("DELETE FROM production_reports WHERE report_id = ?");
-$result = $stmt->execute([$report_id]);
+$stmt = $pdo->prepare("DELETE FROM production_reports WHERE report_id = ? AND company_id = ?");
+$result = $stmt->execute([$report_id, $company_id]);
 
 if ($result) {
     echo json_encode(['success' => true, 'message' => 'Report deleted successfully']);

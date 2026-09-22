@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -10,14 +11,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 csrf_verify();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $report_id = $_POST['report_id'] ?? null;
 
 if (!$report_id) {
     die("Invalid report ID.");
 }
 
-$stmt = $pdo->prepare("SELECT * FROM production_reports WHERE report_id = ? AND user_id = ?");
-$stmt->execute([$report_id, $user_id]);
+$stmt = $pdo->prepare("SELECT * FROM production_reports WHERE report_id = ? AND user_id = ? AND company_id = ?");
+$stmt->execute([$report_id, $user_id, $company_id]);
 $report = $stmt->fetch();
 
 if (!$report || $report['status'] !== 'Progress') {
@@ -73,7 +75,7 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
 
 $stmt = $pdo->prepare("UPDATE production_reports SET 
     report_date = ?, job_type = ?, title = ?, description = ?, status = ?, workforce_id = ?, proof_link = ?, proof_image = ?
-    WHERE report_id = ? AND user_id = ?");
+    WHERE report_id = ? AND user_id = ? AND company_id = ?");
 
 $result = $stmt->execute([
     $report_date,
@@ -86,6 +88,7 @@ $result = $stmt->execute([
     $proof_image,
     $report_id,
     $user_id
+    ,$company_id
 ]);
 
 if ($result) {

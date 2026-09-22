@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 if (!isset($_SESSION['user'])) {
@@ -13,6 +14,7 @@ if (!isset($_SESSION['user'])) {
 }
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request']);
@@ -31,8 +33,8 @@ if ($data['action'] !== 'mark_done') {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT user_id, status FROM production_reports WHERE report_id = ?");
-    $stmt->execute([$report_id]);
+    $stmt = $pdo->prepare("SELECT user_id, status FROM production_reports WHERE report_id = ? AND company_id = ?");
+    $stmt->execute([$report_id, $company_id]);
     $report = $stmt->fetch();
 
     if (!$report) {
@@ -52,8 +54,8 @@ try {
         exit;
     }
 
-    $update = $pdo->prepare("UPDATE production_reports SET status = 'Completed' WHERE report_id = ?");
-    $update->execute([$report_id]);
+    $update = $pdo->prepare("UPDATE production_reports SET status = 'Completed' WHERE report_id = ? AND company_id = ?");
+    $update->execute([$report_id, $company_id]);
 
     echo json_encode([
         'success' => true,

@@ -2,9 +2,11 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die("Access denied.");
@@ -23,8 +25,8 @@ if (empty($title) || empty($report_date) || $job_type_id <= 0) {
     die("Incomplete data.");
 }
 
-$stmt_lookup = $pdo->prepare("SELECT name FROM job_type WHERE job_type_id = ?");
-$stmt_lookup->execute([$job_type_id]);
+$stmt_lookup = $pdo->prepare("SELECT name FROM job_type WHERE job_type_id = ? AND company_id = ?");
+$stmt_lookup->execute([$job_type_id, $company_id]);
 $job_type_row = $stmt_lookup->fetch();
 
 if (!$job_type_row) {
@@ -32,8 +34,8 @@ if (!$job_type_row) {
 }
 $job_type = $job_type_row['name'];
 
-$employeeStmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-$employeeStmt->execute([$user_id]);
+$employeeStmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+$employeeStmt->execute([$user_id, $company_id]);
 $employee = $employeeStmt->fetch();
 
 if (!$employee) {
@@ -42,8 +44,8 @@ if (!$employee) {
 
 $employee_id = $employee['employee_id'];
 
-$check = $pdo->prepare("SELECT 1 FROM work_force WHERE workforce_id = ?");
-$check->execute([$workforce_id]);
+$check = $pdo->prepare("SELECT 1 FROM work_force WHERE workforce_id = ? AND company_id = ?");
+$check->execute([$workforce_id, $company_id]);
 if (!$check->fetch()) {
     die("Invalid workforce.");
 }
@@ -109,10 +111,11 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
 try {
     $stmt = $pdo->prepare("
         INSERT INTO production_reports 
-        (user_id, report_date, job_type, title, description, status, proof_link, proof_image, workforce_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (company_id, user_id, report_date, job_type, title, description, status, proof_link, proof_image, workforce_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
+        $company_id,
         $user_id,
         $report_date,
         $job_type,

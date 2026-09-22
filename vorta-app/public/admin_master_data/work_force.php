@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -27,12 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
   } else {
     try {
       if ($action === 'create') {
-        $stmt = $pdo->prepare("INSERT INTO work_force (workforce_name) VALUES (?)");
-        $stmt->execute([$workforce_name]);
+        $stmt = $pdo->prepare("INSERT INTO work_force (company_id, workforce_name) VALUES (?, ?)");
+        $stmt->execute([$company_id, $workforce_name]);
         $_SESSION['success'] = "Work force added successfully.";
       } elseif ($action === 'update') {
-        $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ?");
-        $stmt->execute([$workforce_name, $workforce_id]);
+        $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ? AND company_id = ?");
+        $stmt->execute([$workforce_name, $workforce_id, $company_id]);
         if ($stmt->rowCount()) {
           $_SESSION['success'] = "Work force updated successfully.";
         } else {
@@ -61,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_work_force']))
   csrf_verify();
   $workforce_id = (int)$_POST['delete_work_force'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM work_force WHERE workforce_id = ?");
-    $stmt->execute([$workforce_id]);
+    $stmt = $pdo->prepare("DELETE FROM work_force WHERE workforce_id = ? AND company_id = ?");
+    $stmt->execute([$workforce_id, $company_id]);
 
     if ($stmt->rowCount()) {
       $_SESSION['success'] = "Work force deleted successfully.";
@@ -87,6 +89,9 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM work_force $whereSql");
 foreach ($params as $i => $val) {
   $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);
