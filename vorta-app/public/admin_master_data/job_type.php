@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
+$company_id = current_company_id();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -15,6 +19,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
+    csrf_verify();
     $name = trim($_POST['name']);
     $action = $_POST['action'] ?? '';
     $job_type_id = (int)($_POST['job_type_id'] ?? 0);
@@ -24,12 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     } else {
         try {
             if ($action === 'create') {
-                $stmt = $pdo->prepare("INSERT INTO job_type (name) VALUES (?)");
-                $stmt->execute([$name]);
+                $stmt = $pdo->prepare("INSERT INTO job_type (company_id, name) VALUES (?, ?)");
+                $stmt->execute([$company_id, $name]);
+                audit_log($pdo, 'job_type.created', 'job_type', $pdo->lastInsertId());
                 $_SESSION['success'] = "Job type added successfully.";
             } elseif ($action === 'update') {
-                $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ?");
-                $stmt->execute([$name, $job_type_id]);
+                $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ? AND company_id = ?");
+                $stmt->execute([$name, $job_type_id, $company_id]);
+                audit_log($pdo, 'job_type.updated', 'job_type', $job_type_id);
                 if ($stmt->rowCount()) {
                     $_SESSION['success'] = "Job type updated successfully.";
                 } else {
@@ -54,11 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'job_type') {
     }
 }
 
-if (isset($_GET['delete_job_type'])) {
-    $job_type_id = (int)$_GET['delete_job_type'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job_type'])) {
+    csrf_verify();
+    $job_type_id = (int)$_POST['delete_job_type'];
     try {
-        $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ?");
-        $stmt->execute([$job_type_id]);
+        $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ? AND company_id = ?");
+        $stmt->execute([$job_type_id, $company_id]);
+        audit_log($pdo, 'job_type.deleted', 'job_type', $job_type_id);
 
         if ($stmt->rowCount()) {
             $_SESSION['success'] = "Job type deleted successfully.";
@@ -83,6 +92,9 @@ if ($search) {
     $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM job_type $whereSql");
 foreach ($params as $i => $val) {
     $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);
@@ -124,6 +136,7 @@ function page_url($p) {
     Added New Job Type
   </h2>
   <form method="POST">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="job_type">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="job_type_id" value="" id="job-type-id-input">
@@ -198,13 +211,13 @@ function page_url($p) {
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editJobType(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
+                    onclick="editJobType(<?= (int)$jt['job_type_id'] ?>, <?= htmlspecialchars(json_encode($jt['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDelete(<?= (int)$jt['job_type_id'] ?>, <?= json_encode($jt['name']) ?>)'
+                    onclick="confirmDelete(<?= (int)$jt['job_type_id'] ?>, <?= htmlspecialchars(json_encode($jt['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>
@@ -305,6 +318,24 @@ document.getElementById('cancel-edit')?.addEventListener('click', function () {
     this.classList.add('hidden');
 });
 
+function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+        ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+        [name, value]
+    ].forEach(([key, val]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = val;
+        form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+}
+
 function confirmDelete(id, name) {
     Swal.fire({
         title: 'Delete this record?',
@@ -317,9 +348,7 @@ function confirmDelete(id, name) {
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('delete_job_type', id);
-            window.location.href = url.toString();
+            submitDelete('delete_job_type', id);
         }
     });
 }

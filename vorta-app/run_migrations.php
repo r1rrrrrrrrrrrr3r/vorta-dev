@@ -1,11 +1,22 @@
 <?php
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit("CLI only.\n");
+}
+
 require_once __DIR__ . '/lib/db.php';
 
 echo "Running migrations...\n";
 
 $versionFile = __DIR__ . '/migrations/schema_version.php';
 $currentVersion = (int) require $versionFile;
+
+$companiesTable = $pdo->query("SHOW TABLES LIKE 'companies'")->fetchColumn();
+if (!$companiesTable) {
+    $currentVersion = 0;
+    echo "Fresh database detected; applying the complete migration sequence.\n";
+}
 
 $migrationFiles = glob(__DIR__ . '/migrations/[0-9]*_*.php');
 sort($migrationFiles);

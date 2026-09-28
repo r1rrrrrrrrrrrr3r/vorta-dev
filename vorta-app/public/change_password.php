@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
@@ -9,6 +11,7 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $result = account_change_password(
         $pdo,
         (int) $user_id,
@@ -17,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['confirm_password'] ?? ''
     );
     if ($result['ok']) {
+        audit_log($pdo, 'password.changed', 'users', $user_id);
         $success = $result['message'];
     } else {
         $error = $result['message'];
@@ -94,6 +98,7 @@ include __DIR__ . '/header.php';
                 <?php endif; ?>
 
                 <form method="POST" id="passwordForm" class="space-y-6">
+                    <?= csrf_field() ?>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Current Password</label>
                         <div class="pw-wrap">

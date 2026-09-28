@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
+$company_id = current_company_id();
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -41,6 +45,7 @@ function getEnumValues($pdo, $table, $column)
 $position_enum = getEnumValues($pdo, 'employees', 'position');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
+  csrf_verify();
   $name = trim($_POST['name'] ?? '');
   $position = trim($_POST['position'] ?? '');
   $phone = trim($_POST['phone'] ?? '');
@@ -59,19 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
     try {
       if ($action === 'create') {
 
-        $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-        $check->execute([$user_id]);
+        $check = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+        $check->execute([$user_id, $company_id]);
         if ($check->fetch()) {
           $_SESSION['error'] = "This user is already an employee.";
         } else {
-          $stmt = $pdo->prepare("INSERT INTO employees (user_id, name, position, phone) VALUES (?, ?, ?, ?)");
-          $stmt->execute([$user_id, $name, $position, $phone]);
+          $stmt = $pdo->prepare("INSERT INTO employees (company_id, user_id, name, position, phone) VALUES (?, ?, ?, ?, ?)");
+          $stmt->execute([$company_id, $user_id, $name, $position, $phone]);
+          audit_log($pdo, 'employee.created', 'employees', $pdo->lastInsertId(), ['user_id' => $user_id]);
           $_SESSION['success'] = "Employee added successfully.";
         }
       } elseif ($action === 'update') {
 
-        $check = $pdo->prepare("SELECT user_id FROM employees WHERE employee_id = ?");
-        $check->execute([$employee_id]);
+        $check = $pdo->prepare("SELECT user_id FROM employees WHERE employee_id = ? AND company_id = ?");
+        $check->execute([$employee_id, $company_id]);
         $existing = $check->fetch();
 
         if (!$existing) {
@@ -79,16 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
         } else {
 
           if ($existing['user_id'] != $user_id) {
-            $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-            $check_user->execute([$user_id]);
+            $check_user = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+            $check_user->execute([$user_id, $company_id]);
             if ($check_user->fetch()) {
               $_SESSION['error'] = "This user is already linked to another employee.";
             }
           }
 
           if (!isset($_SESSION['error'])) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ?");
-            $stmt->execute([$name, $position, $phone, $employee_id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, position = ?, phone = ? WHERE employee_id = ? AND company_id = ?");
+            $stmt->execute([$name, $position, $phone, $employee_id, $company_id]);
+            audit_log($pdo, 'employee.updated', 'employees', $employee_id);
             $_SESSION['success'] = "Employee updated successfully.";
           }
         }
@@ -107,11 +114,144 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'employees') {
   exit;
 }
 
-if (isset($_GET['delete_emp'])) {
-  $employee_id = (int)$_GET['delete_emp'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'employee_import') {
+  csrf_verify();
+  $file = $_FILES['employee_csv'] ?? null;
+  $imported = 0;
+  $errors = [];
+  if (!$file || $file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
+    $_SESSION['error'] = 'Choose a valid CSV file.';
+  } elseif (($file['size'] ?? 0) > 2097152) {
+    $_SESSION['error'] = 'CSV files must be 2 MB or smaller.';
+  } else {
+    $handle = fopen($file['tmp_name'], 'rb');
+    $firstLine = $handle ? fgets($handle) : false;
+    $delimiter = ',';
+    if (is_string($firstLine)) {
+      $counts = [
+        ',' => substr_count($firstLine, ','),
+        ';' => substr_count($firstLine, ';'),
+        "\t" => substr_count($firstLine, "\t"),
+      ];
+      arsort($counts);
+      $delimiter = (string)array_key_first($counts);
+      rewind($handle);
+    }
+    $header = $handle ? fgetcsv($handle, 0, $delimiter) : false;
+    $normalizeHeader = static function ($value): string {
+      $value = preg_replace('/^\xEF\xBB\xBF/', '', (string)$value);
+      return strtolower(trim((string)preg_replace('/[^a-z0-9]+/', '_', $value), '_'));
+    };
+    $header = $header ? array_map($normalizeHeader, $header) : [];
+    $headerMap = [];
+    foreach ($header as $index => $column) {
+      if ($column !== '') {
+        if (isset($headerMap[$column])) {
+          $errors[] = "Header contains duplicate column: {$column}.";
+          continue;
+        }
+        $headerMap[$column] = $index;
+      }
+    }
+    $required = ['email', 'name', 'position'];
+    $missing = array_values(array_diff($required, array_keys($headerMap)));
+    if ($missing) {
+      $errors[] = 'Missing required column(s): ' . implode(', ', $missing) . '. Use email, name, position, and optional phone.';
+    } else {
+      $userStmt = $pdo->prepare('SELECT user_id FROM users WHERE email = ? AND company_id = ?');
+      $employeeCheck = $pdo->prepare('SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?');
+      $insert = $pdo->prepare('INSERT INTO employees (company_id, user_id, name, position, phone) VALUES (?, ?, ?, ?, ?)');
+      $seen = [];
+      $rowNumber = 1;
+      $dataRows = 0;
+      while (($row = fgetcsv($handle)) !== false) {
+        $rowNumber++;
+        if (count($row) === 1 && trim((string)$row[0]) === '') continue;
+        $dataRows++;
+        if ($dataRows > 1000) {
+          $errors[] = 'Import stopped after 1,000 data rows.';
+          break;
+        }
+        foreach ($row as $cell) {
+          if (!mb_check_encoding((string)$cell, 'UTF-8') || strpos((string)$cell, "\0") !== false || preg_match('/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/', (string)$cell)) {
+            $errors[] = "Row {$rowNumber}: contains unsupported control characters.";
+            continue 2;
+          }
+          if (preg_match('/^\s*[=+\-@]/', (string)$cell)) {
+            $errors[] = "Row {$rowNumber}: formula-like values are not allowed.";
+            continue 2;
+          }
+          if (mb_strlen((string)$cell) > 255) {
+            $errors[] = "Row {$rowNumber}: a field is longer than 255 characters.";
+            continue 2;
+          }
+        }
+        $getCell = static function (array $row, array $headerMap, string $column): string {
+          $index = $headerMap[$column] ?? null;
+          return $index !== null ? trim((string)($row[$index] ?? '')) : '';
+        };
+        $email = $getCell($row, $headerMap, 'email');
+        $name = $getCell($row, $headerMap, 'name');
+        $position = $getCell($row, $headerMap, 'position');
+        $phone = $getCell($row, $headerMap, 'phone');
+        if (count($row) < count($header)) {
+          $errors[] = "Row {$rowNumber}: has fewer fields than the header.";
+          continue;
+        }
+        $emailKey = strtolower($email);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+          $errors[] = "Row {$rowNumber}: invalid email.";
+          continue;
+        }
+        if ($name === '') {
+          $errors[] = "Row {$rowNumber}: name is required.";
+          continue;
+        }
+        if (!in_array($position, $position_enum, true)) {
+          $errors[] = "Row {$rowNumber}: position '{$position}' is not allowed. Use: " . implode(', ', $position_enum) . '.';
+          continue;
+        }
+        if (isset($seen[$emailKey])) {
+          $errors[] = "Row {$rowNumber}: duplicate email in this file.";
+          continue;
+        }
+        $seen[$emailKey] = true;
+        $userStmt->execute([$email, $company_id]);
+        $user = $userStmt->fetch();
+        if (!$user) {
+          $errors[] = "Row {$rowNumber}: no matching user account for {$email}.";
+          continue;
+        }
+        $employeeCheck->execute([(int)$user['user_id'], $company_id]);
+        if ($employeeCheck->fetch()) {
+          $errors[] = "Row {$rowNumber}: {$email} is already an employee.";
+          continue;
+        }
+        $insert->execute([$company_id, (int)$user['user_id'], $name, $position, $phone]);
+        $imported++;
+      }
+      fclose($handle);
+    }
+    if ($imported > 0) {
+      audit_log($pdo, 'employee.imported', 'employees', null, ['count' => $imported]);
+    }
+    $_SESSION['success'] = "{$imported} employee(s) imported.";
+    if ($errors) $_SESSION['error'] = implode(' ', array_slice($errors, 0, 5)) . (count($errors) > 5 ? ' More rows were skipped.' : '');
+  }
+  $params = ['tab' => 'employees', 'page' => $page];
+  if ($search) $params['search'] = $search;
+  $redirect = 'admin_master_data.php?' . http_build_query($params);
+  echo '<script>window.location.href = ' . json_encode($redirect, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';</script>';
+  exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_emp'])) {
+  csrf_verify();
+  $employee_id = (int)$_POST['delete_emp'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ?");
-    $stmt->execute([$employee_id]);
+    $stmt = $pdo->prepare("DELETE FROM employees WHERE employee_id = ? AND company_id = ?");
+    $stmt->execute([$employee_id, $company_id]);
+    audit_log($pdo, 'employee.deleted', 'employees', $employee_id);
     $_SESSION['success'] = "Employee deleted successfully.";
   } catch (PDOException $e) {
     $_SESSION['error'] = "Failed to delete: " . $e->getMessage();
@@ -131,6 +271,9 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "e.company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalSql = "SELECT COUNT(*) AS cnt FROM employees e $whereSql";
 $totalStmt = $pdo->prepare($totalSql);
 foreach ($params as $i => $val) {
@@ -143,7 +286,7 @@ $totalPages = (int)ceil($totalEmployees / $perPage);
 $sql = "
     SELECT e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
     FROM employees e 
-    JOIN users u ON u.user_id = e.user_id 
+    JOIN users u ON u.user_id = e.user_id AND u.company_id = e.company_id
     $whereSql 
     ORDER BY e.employee_id ASC 
     LIMIT ? OFFSET ?
@@ -164,7 +307,8 @@ $allUsersStmt = $pdo->query("
         u.name,
         e.employee_id IS NOT NULL as is_employee
     FROM users u
-    LEFT JOIN employees e ON u.user_id = e.user_id
+    LEFT JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    WHERE u.company_id = $company_id
     ORDER BY u.name
 ");
 $all_users = $allUsersStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -195,6 +339,7 @@ function page_url($p)
     <div class="text-sm text-gray-600">Total Employees: <span class="font-medium"><?= $totalEmployees ?></span></div>
   </div>
   <form method="POST">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="employees">
     <input type="hidden" name="action" value="create" id="emp-action">
     <input type="hidden" name="employee_id" value="" id="emp-id">
@@ -214,7 +359,7 @@ function page_url($p)
               <?= $is_used && !$is_current ? 'disabled' : '' ?>
               <?= ($current_user_id ?? '') == $u['user_id'] ? 'selected' : '' ?>>
               <?= htmlspecialchars($u['name']) ?>
-              <?php if ($is_used && !$is_current): ?> (Sudah jadi employee) <?php endif; ?>
+              <?php if ($is_used && !$is_current): ?> (Employee) <?php endif; ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -248,6 +393,67 @@ function page_url($p)
     </div>
   </form>
 </div>
+
+<style>
+  .vorta-import { margin-bottom:32px; padding:20px; background:var(--surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:16px; box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06),0 6px 18px -8px rgba(0,0,0,.12)); }
+  .vorta-import__head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; }
+  .vorta-import__intro { display:flex; align-items:flex-start; gap:12px; }
+  .vorta-import__icon { flex:0 0 40px; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(99,102,241,.12); }
+  .vorta-import__icon svg { display:block; color:#4f46e5; }
+  .vorta-import__title { margin:0; font-size:18px; font-weight:700; color:var(--text,#1f2937); }
+  .vorta-import__subtitle { margin:4px 0 0; font-size:14px; color:var(--text-muted,#6b7280); }
+  .vorta-import__chip { margin-top:8px; font-size:12px; color:var(--text-muted,#6b7280); }
+  .vorta-import__chip code { background:var(--surface-3,#f3f4f6); color:var(--text,#1f2937); padding:2px 8px; border-radius:6px; font-size:12px; }
+  .vorta-import__template { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; padding:9px 14px; border-radius:10px; border:1px solid var(--border,#e5e7eb); background:var(--surface,#fff); color:var(--text,#1f2937); font-size:13px; font-weight:600; text-decoration:none; transition:background .15s ease; }
+  .vorta-import__template:hover { background:var(--surface-3,#f3f4f6); }
+  .vorta-import__form { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+  .vorta-file { position:relative; flex:1 1 260px; min-width:0; }
+  .vorta-file__fake { display:flex; align-items:center; gap:8px; width:100%; box-sizing:border-box; padding:10px 14px; border-radius:10px; border:1px solid var(--border,#e5e7eb); background:var(--surface,#fff); color:var(--text-muted,#6b7280); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vorta-file__fake svg { flex:0 0 16px; color:var(--text-muted,#9ca3af); }
+  .vorta-file:hover .vorta-file__fake { border-color:#a5b4fc; }
+  .vorta-file__input { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; }
+  .vorta-import__submit { padding:10px 20px; border-radius:10px; border:none; background:#4f46e5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:background .15s ease; }
+  .vorta-import__submit:hover { background:#4338ca; }
+  @media (max-width:480px) { .vorta-import { padding:16px; } .vorta-import__icon { display:none; } .vorta-import__template { width:100%; justify-content:center; } }
+</style>
+<div class="vorta-import">
+  <div class="vorta-import__head">
+    <div class="vorta-import__intro">
+      <div class="vorta-import__icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></svg>
+      </div>
+      <div>
+        <h2 class="vorta-import__title">Import employees in bulk</h2>
+        <p class="vorta-import__subtitle">Upload a CSV exported from Excel. User accounts must already exist.</p>
+        <p class="vorta-import__chip">Required columns: <code>email,name,position</code> · optional: <code>phone</code></p>
+      </div>
+    </div>
+    <a href="data:text/csv;charset=utf-8,email%2Cname%2Cposition%2Cphone%0Aemployee%40example.com%2CJane%20Doe%2CEmployee%2C08123456789"
+      download="vorta-employees-template.csv" class="vorta-import__template">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
+      Download template
+    </a>
+  </div>
+  <form method="POST" enctype="multipart/form-data" class="vorta-import__form">
+    <input type="hidden" name="entity" value="employee_import">
+    <?= csrf_field() ?>
+    <div class="vorta-file">
+      <span class="vorta-file__fake" id="employee-file-label">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path></svg>
+        Choose CSV file
+      </span>
+      <input id="employee-csv" class="vorta-file__input" type="file" name="employee_csv" accept=".csv,text/csv" required>
+    </div>
+    <button type="submit" class="vorta-import__submit">Import CSV</button>
+  </form>
+</div>
+<script>
+ document.getElementById('employee-csv')?.addEventListener('change', function () {
+   const label = document.getElementById('employee-file-label');
+   const name = this.files[0]?.name;
+   label.lastChild.textContent = name ? ' ' + name : ' Choose CSV file';
+ });
+</script>
 
 <div class="mb-6">
   <form method="GET" class="flex flex-col sm:flex-row gap-3">
@@ -313,13 +519,13 @@ function page_url($p)
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= json_encode($e['name']) ?>, <?= json_encode($e['position'] ?? '') ?>, <?= json_encode($e['phone'] ?? '') ?>)'
+                    onclick="editEmployee(<?= (int)$e['employee_id'] ?>, <?= (int)$e['user_id'] ?>, <?= htmlspecialchars(json_encode($e['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($e['position'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($e['phone'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= json_encode($e['name']) ?>)'
+                    onclick="confirmDeleteEmployee(<?= (int)$e['employee_id'] ?>, <?= htmlspecialchars(json_encode($e['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>
@@ -426,6 +632,24 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
+  function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+      ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+      [name, value]
+    ].forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function confirmDeleteEmployee(employeeId, employeeName) {
     Swal.fire({
       title: 'Delete this record?',
@@ -438,7 +662,7 @@ function page_url($p)
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        window.location.href = `<?= page_url($page) ?>&delete_emp=${employeeId}`;
+        submitDelete('delete_emp', employeeId);
       }
     });
   }

@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
+$company_id = current_company_id();
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -16,6 +20,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') {
+  csrf_verify();
   $workforce_name = trim($_POST['workforce_name']);
   $action = $_POST['action'] ?? '';
   $workforce_id = (int)($_POST['workforce_id'] ?? 0);
@@ -25,12 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
   } else {
     try {
       if ($action === 'create') {
-        $stmt = $pdo->prepare("INSERT INTO work_force (workforce_name) VALUES (?)");
-        $stmt->execute([$workforce_name]);
+        $stmt = $pdo->prepare("INSERT INTO work_force (company_id, workforce_name) VALUES (?, ?)");
+        $stmt->execute([$company_id, $workforce_name]);
+        audit_log($pdo, 'workforce.created', 'work_force', $pdo->lastInsertId());
         $_SESSION['success'] = "Work force added successfully.";
       } elseif ($action === 'update') {
-        $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ?");
-        $stmt->execute([$workforce_name, $workforce_id]);
+        $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ? AND company_id = ?");
+        $stmt->execute([$workforce_name, $workforce_id, $company_id]);
+        audit_log($pdo, 'workforce.updated', 'work_force', $workforce_id);
         if ($stmt->rowCount()) {
           $_SESSION['success'] = "Work force updated successfully.";
         } else {
@@ -55,11 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') 
   }
 }
 
-if (isset($_GET['delete_work_force'])) {
-  $workforce_id = (int)$_GET['delete_work_force'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_work_force'])) {
+  csrf_verify();
+  $workforce_id = (int)$_POST['delete_work_force'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM work_force WHERE workforce_id = ?");
-    $stmt->execute([$workforce_id]);
+    $stmt = $pdo->prepare("DELETE FROM work_force WHERE workforce_id = ? AND company_id = ?");
+    $stmt->execute([$workforce_id, $company_id]);
+    audit_log($pdo, 'workforce.deleted', 'work_force', $workforce_id);
 
     if ($stmt->rowCount()) {
       $_SESSION['success'] = "Work force deleted successfully.";
@@ -84,6 +93,9 @@ if ($search) {
   $params[] = "%$search%";
 }
 $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM work_force $whereSql");
 foreach ($params as $i => $val) {
   $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);
@@ -125,6 +137,7 @@ function page_url($p)
     Added New Work Force
   </h2>
   <form method="POST" id="workforce-form">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="work_force">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="workforce_id" value="" id="workforce-id-input">
@@ -199,13 +212,13 @@ function page_url($p)
                 <td class="py-4 whitespace-nowrap space-x-1">
                   <button
                     type="button"
-                    onclick='editWorkforce(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
+                    onclick="editWorkforce(<?= (int)$wf['workforce_id'] ?>, <?= htmlspecialchars(json_encode($wf['workforce_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
                     Edit
                   </button>
                   <button
                     type="button"
-                    onclick='confirmDelete(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
+                    onclick="confirmDelete(<?= (int)$wf['workforce_id'] ?>, <?= htmlspecialchars(json_encode($wf['workforce_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)"
                     class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
                     Delete
                   </button>
@@ -307,6 +320,24 @@ function page_url($p)
     this.classList.add('hidden');
   });
 
+  function submitDelete(name, value) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    [
+      ['csrf_token', document.querySelector('input[name="csrf_token"]').value],
+      [name, value]
+    ].forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function confirmDelete(id, name) {
     Swal.fire({
       title: 'Delete this record?',
@@ -319,10 +350,7 @@ function page_url($p)
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('delete_work_force', id);
-        url.searchParams.set('tab', 'work_force');
-        window.location.href = url.toString();
+        submitDelete('delete_work_force', id);
       }
     });
   }

@@ -2,7 +2,11 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = $_SESSION['user']['user_id'];
 $report_id = $_GET['id'] ?? null;
@@ -15,8 +19,8 @@ if (!$report_id) {
 $stmt = $pdo->prepare("SELECT pr.*, wf.workforce_name 
                        FROM production_reports pr
                        LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-                       WHERE pr.report_id = ? AND pr.user_id = ?");
-$stmt->execute([$report_id, $user_id]);
+                       WHERE pr.report_id = ? AND pr.user_id = ? AND pr.company_id = ?");
+$stmt->execute([$report_id, $user_id, $company_id]);
 $report = $stmt->fetch();
 
 if (!$report) {
@@ -28,10 +32,12 @@ if ($report['status'] !== 'Progress') {
     exit;
 }
 
-$job_types_stmt = $pdo->query("SELECT job_type_id, name FROM job_type ORDER BY name");
+$job_types_stmt = $pdo->prepare("SELECT job_type_id, name FROM job_type WHERE company_id = ? ORDER BY name");
+$job_types_stmt->execute([$company_id]);
 $job_types = $job_types_stmt->fetchAll();
 
-$workforce_stmt = $pdo->query("SELECT workforce_id, workforce_name FROM work_force ORDER BY workforce_name");
+$workforce_stmt = $pdo->prepare("SELECT workforce_id, workforce_name FROM work_force WHERE company_id = ? ORDER BY workforce_name");
+$workforce_stmt->execute([$company_id]);
 $workforces = $workforce_stmt->fetchAll();
 
 include __DIR__ . '/header.php';
@@ -57,6 +63,7 @@ include __DIR__ . '/header.php';
                 </h1>
 
                 <form action="update_report.php" method="POST" enctype="multipart/form-data" class="space-y-6">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="report_id" value="<?= (int)$report['report_id'] ?>">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -140,7 +147,7 @@ include __DIR__ . '/header.php';
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Proof (Photo)</label>
                         <?php if (!empty($report['proof_image'])): ?>
                             <div class="mb-3">
-                                <img src="../uploads/<?= htmlspecialchars(rawurlencode(basename($report['proof_image']))) ?>" alt="Current Proof"
+                                <img src="my_reports.php?proof_image=<?= (int)$report['report_id'] ?>" alt="Current Proof"
                                     class="max-w-xs h-auto rounded border shadow-sm">
                                 <p class="text-xs text-gray-500 mt-1">Current image. Leave empty to keep using this image.</p>
                             </div>

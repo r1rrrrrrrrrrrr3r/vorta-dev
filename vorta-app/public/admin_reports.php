@@ -2,7 +2,10 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_admin();
+$company_id = current_company_id();
 
 $detailOwnerId = null;
 $detailSelf = basename(__FILE__);
@@ -18,8 +21,8 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
             FROM production_reports pr
             LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
             JOIN users u ON u.user_id = pr.user_id
-            WHERE pr.report_id = ?";
-    $params = [$reportId];
+            WHERE pr.report_id = ? AND pr.company_id = ?";
+    $params = [$reportId, current_company_id()];
     if ($ownerId !== null) {
         $sql .= " AND pr.user_id = ?";
         $params[] = $ownerId;
@@ -33,8 +36,8 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 if (isset($_GET['proof_image'])) {
     $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
     $file = $row ? basename((string)$row['proof_image']) : '';
-    $path = __DIR__ . '/../uploads/' . $file;
-    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
+    $path = $row ? upload_absolute_path((string)$row['proof_image']) : null;
+    $mime = ($file !== '' && $path && is_file($path)) ? mime_content_type($path) : false;
     if (!$mime || strpos($mime, 'image/') !== 0) {
         http_response_code(404);
         exit;
@@ -63,7 +66,7 @@ if (isset($_GET['detail'])) {
     $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
     $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
     $hasImage = $imageFile !== '';
-    $imageExists = $hasImage && is_file(__DIR__ . '/../uploads/' . $imageFile);
+    $imageExists = $hasImage && upload_absolute_path((string)$row['proof_image']) !== null;
     $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
 
     $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';
@@ -183,9 +186,9 @@ $countStmt = $pdo->prepare("
   FROM production_reports pr
   JOIN users u ON u.user_id = pr.user_id
   LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-  WHERE pr.report_date BETWEEN ? AND ?
+  WHERE pr.company_id = ? AND pr.report_date BETWEEN ? AND ?
 ");
-$countStmt->execute([$start, $end]);
+$countStmt->execute([$company_id, $start, $end]);
 $totalReports = (int)$countStmt->fetchColumn();
 $totalPages = (int)ceil($totalReports / $limit);
 
@@ -200,11 +203,11 @@ $stmt = $pdo->prepare("
   FROM production_reports pr
   JOIN users u ON u.user_id = pr.user_id
   LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-  WHERE pr.report_date BETWEEN ? AND ?
+  WHERE pr.company_id = ? AND pr.report_date BETWEEN ? AND ?
   ORDER BY pr.report_date DESC, pr.report_id DESC
   LIMIT $limit OFFSET $offset
 ");
-$stmt->execute([$start, $end]);
+$stmt->execute([$company_id, $start, $end]);
 $rows = $stmt->fetchAll();
 
 $today = date('Y-m-d');
@@ -215,9 +218,9 @@ $shortOffset = ($shortPage - 1) * $shortLimit;
 $countShort = $pdo->prepare("
   SELECT COUNT(*)
   FROM users u
-  WHERE u.is_active = 1 AND u.role <> 'admin'
+  WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
 ");
-$countShort->execute();
+$countShort->execute([$company_id]);
 $totalShort = (int)$countShort->fetchColumn();
 $totalShortPages = (int)ceil($totalShort / $shortLimit);
 
@@ -237,14 +240,14 @@ $short = $pdo->prepare("
     GROUP_CONCAT(DISTINCT pr.job_type ORDER BY pr.report_id SEPARATOR ', ') AS job_types,
     GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') AS report_titles
   FROM users u
-  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-  LEFT JOIN employees e ON e.user_id = u.user_id
-  WHERE u.is_active = 1 AND u.role <> 'admin'
+  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.company_id = u.company_id AND pr.report_date = ?
+  LEFT JOIN employees e ON e.user_id = u.user_id AND e.company_id = u.company_id
+  WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
   GROUP BY u.user_id, u.name, u.email, e.position
   ORDER BY report_count ASC, u.name
   LIMIT $shortLimit OFFSET $shortOffset
 ");
-$short->execute([$today]);
+$short->execute([$today, $company_id]);
 $shortRows = $short->fetchAll();
 
 $statsStmt = $pdo->prepare("
@@ -258,12 +261,12 @@ $statsStmt = $pdo->prepare("
       u.user_id,
       COUNT(pr.report_id) AS report_count
     FROM users u
-    LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-    WHERE u.is_active = 1 AND u.role <> 'admin'
+    LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.company_id = u.company_id AND pr.report_date = ?
+    WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
     GROUP BY u.user_id
   ) AS user_reports
 ");
-$statsStmt->execute([$dailyMin, $dailyMin, $today]);
+$statsStmt->execute([$dailyMin, $dailyMin, $today, $company_id]);
 $stats = $statsStmt->fetch();
 
 $totalActive = (int)($stats['total_active_users'] ?? 0);

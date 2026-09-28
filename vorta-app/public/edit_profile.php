@@ -2,7 +2,11 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = $_SESSION['user']['user_id'] ?? 0;
 
@@ -10,6 +14,7 @@ $profileError = '';
 $profileSuccess = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $result = account_update_profile(
         $pdo,
         (int) $user_id,
@@ -18,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['phone'] ?? ''
     );
     if ($result['ok']) {
+        audit_log($pdo, 'profile.updated', 'users', $user_id);
         $profileSuccess = $result['message'];
         $_SESSION['user']['name'] = trim($_POST['name']);
         $_SESSION['user']['email'] = trim($_POST['email']);
@@ -34,10 +40,10 @@ $stmt = $pdo->prepare("
         e.phone,
         e.position
     FROM users u
-    LEFT JOIN employees e ON u.user_id = e.user_id
-    WHERE u.user_id = ?
+    LEFT JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    WHERE u.user_id = ? AND u.company_id = ?
 ");
-$stmt->execute([$user_id]);
+$stmt->execute([$user_id, $company_id]);
 $user = $stmt->fetch();
 
 if (!$user) {
@@ -143,6 +149,7 @@ include __DIR__ . '/header.php';
                 <?php endif; ?>
 
                 <form method="POST" class="space-y-6">
+                    <?= csrf_field() ?>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>

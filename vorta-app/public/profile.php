@@ -2,25 +2,27 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = $_SESSION['user']['user_id'];
 $today = date('Y-m-d');
 
-$stmt = $pdo->prepare("SELECT u.*, e.position, e.phone FROM users u LEFT JOIN employees e ON e.user_id = u.user_id WHERE u.user_id = ?");
-$stmt->execute([$user_id]);
+$stmt = $pdo->prepare("SELECT u.*, e.position, e.phone FROM users u LEFT JOIN employees e ON e.user_id = u.user_id WHERE u.user_id = ? AND u.company_id = ?");
+$stmt->execute([$user_id, $company_id]);
 $profile = $stmt->fetch();
 
-$stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND date = ?");
-$stmt->execute([$user_id, $today]);
+$stmt = $pdo->prepare("SELECT * FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+$stmt->execute([$user_id, $company_id, $today]);
 $attendance = $stmt->fetch();
 
 $targetRange = settings_get_monthly_target($pdo);
 $target = $targetRange['max'];
 $monthStart = date('Y-m-01');
 $monthEnd = date('Y-m-t');
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
-$stmt->execute([$user_id, $monthStart, $monthEnd]);
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?");
+$stmt->execute([$user_id, $company_id, $monthStart, $monthEnd]);
 $reportCount = (int)$stmt->fetchColumn();
 $progress = min(100, round(($reportCount / $target) * 100));
 

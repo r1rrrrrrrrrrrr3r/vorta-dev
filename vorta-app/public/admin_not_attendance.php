@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 
 $selected_date = $_GET['date'] ?? date('Y-m-d');
@@ -27,16 +29,17 @@ $stmt = $pdo->prepare("
         u.email,
         e.position
     FROM users u
-    JOIN employees e ON u.user_id = e.user_id
-    LEFT JOIN attendance a ON u.user_id = a.user_id AND a.date = ?
-    WHERE u.role != 'admin'
+    JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    LEFT JOIN attendance a ON u.user_id = a.user_id AND a.company_id = u.company_id AND a.date = ?
+    WHERE u.company_id = ? AND u.role != 'admin'
       AND a.user_id IS NULL
     ORDER BY e.position, u.name
     LIMIT ? OFFSET ?
 ");
 $stmt->bindValue(1, $selected_date, PDO::PARAM_STR);
-$stmt->bindValue(2, $limit, PDO::PARAM_INT);
-$stmt->bindValue(3, $offset, PDO::PARAM_INT);
+$stmt->bindValue(2, $company_id, PDO::PARAM_INT);
+$stmt->bindValue(3, $limit, PDO::PARAM_INT);
+$stmt->bindValue(4, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $users_not_checked_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -44,12 +47,12 @@ $users_not_checked_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $totalStmt = $pdo->prepare("
     SELECT COUNT(*)
     FROM users u
-    JOIN employees e ON u.user_id = e.user_id
-    LEFT JOIN attendance a ON u.user_id = a.user_id AND a.date = ?
-    WHERE u.role != 'admin'
+    JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    LEFT JOIN attendance a ON u.user_id = a.user_id AND a.company_id = u.company_id AND a.date = ?
+    WHERE u.company_id = ? AND u.role != 'admin'
       AND a.user_id IS NULL
 ");
-$totalStmt->execute([$selected_date]);
+$totalStmt->execute([$selected_date, $company_id]);
 $total_not_checked_in = $totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total_not_checked_in / $limit));
 
@@ -58,9 +61,9 @@ $totalEmpStmt = $pdo->prepare("
     SELECT COUNT(*) 
     FROM users u
     JOIN employees e ON u.user_id = e.user_id
-    WHERE u.role != 'admin'
+    WHERE u.company_id = ? AND u.role != 'admin'
 ");
-$totalEmpStmt->execute();
+$totalEmpStmt->execute([$company_id]);
 $total_employees = $totalEmpStmt->fetchColumn();
 
 
@@ -68,11 +71,11 @@ $presentStmt = $pdo->prepare("
     SELECT COUNT(*) 
     FROM attendance a
     JOIN users u ON u.user_id = a.user_id
-    JOIN employees e ON u.user_id = e.user_id
-    WHERE a.date = ? 
+    JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    WHERE a.company_id = ? AND u.company_id = a.company_id AND a.date = ?
       AND u.role != 'admin'
 ");
-$presentStmt->execute([$selected_date]);
+$presentStmt->execute([$company_id, $selected_date]);
 $present_count = $presentStmt->fetchColumn();
 
 $absent_count = $total_not_checked_in;

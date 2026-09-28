@@ -2,9 +2,12 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/uploads.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $detailOwnerId = (int)$user_id;
 
 $detailSelf = basename(__FILE__);
@@ -16,12 +19,13 @@ function report_detail_e($value): string
 
 function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 {
+    $companyId = current_company_id();
     $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
             FROM production_reports pr
             LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-            JOIN users u ON u.user_id = pr.user_id
-            WHERE pr.report_id = ?";
-    $params = [$reportId];
+            JOIN users u ON u.user_id = pr.user_id AND u.company_id = pr.company_id
+            WHERE pr.report_id = ? AND pr.company_id = ?";
+    $params = [$reportId, $companyId];
     if ($ownerId !== null) {
         $sql .= " AND pr.user_id = ?";
         $params[] = $ownerId;
@@ -35,8 +39,8 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 if (isset($_GET['proof_image'])) {
     $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
     $file = $row ? basename((string)$row['proof_image']) : '';
-    $path = __DIR__ . '/../uploads/' . $file;
-    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
+    $path = $row ? upload_absolute_path((string)$row['proof_image']) : null;
+    $mime = ($file !== '' && $path && is_file($path)) ? mime_content_type($path) : false;
     if (!$mime || strpos($mime, 'image/') !== 0) {
         http_response_code(404);
         exit;
@@ -65,7 +69,7 @@ if (isset($_GET['detail'])) {
     $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
     $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
     $hasImage = $imageFile !== '';
-    $imageExists = $hasImage && is_file(__DIR__ . '/../uploads/' . $imageFile);
+    $imageExists = $hasImage && upload_absolute_path((string)$row['proof_image']) !== null;
     $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
 
     $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';
@@ -164,8 +168,8 @@ $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 $monthlyTarget = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
-$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
-$totalStmt->execute([$user_id, $start, $end]);
+$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?");
+$totalStmt->execute([$user_id, $company_id, $start, $end]);
 $total = (int)$totalStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $limit));
 
@@ -173,19 +177,19 @@ $stmt = $pdo->prepare("SELECT
         pr.*,
         wf.workforce_name
     FROM production_reports pr
-    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-    WHERE pr.user_id = ? 
+    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id AND wf.company_id = pr.company_id
+    WHERE pr.user_id = ? AND pr.company_id = ?
       AND pr.report_date BETWEEN ? AND ?
     ORDER BY pr.report_date DESC, pr.report_id DESC
     LIMIT $limit OFFSET $offset");
-$stmt->execute([$user_id, $start, $end]);
+$stmt->execute([$user_id, $company_id, $start, $end]);
 $rows = $stmt->fetchAll();
 
 $stmt2 = $pdo->prepare("SELECT DATE(report_date) d, COUNT(*) c 
                         FROM production_reports 
-                        WHERE user_id = ? AND report_date BETWEEN ? AND ? 
+                        WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?
                         GROUP BY DATE(report_date)");
-$stmt2->execute([$user_id, $start, $end]);
+$stmt2->execute([$user_id, $company_id, $start, $end]);
 $daily = $stmt2->fetchAll();
 
 $labels = [];
