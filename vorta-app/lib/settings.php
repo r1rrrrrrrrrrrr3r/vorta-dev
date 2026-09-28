@@ -22,6 +22,16 @@ function settings_get_daily_min_reports(PDO $pdo): int
     return (int) settings_get($pdo, 'daily_min_reports', 2);
 }
 
+function settings_mark_reviewed(PDO $pdo): void
+{
+    $companyId = (int)($_SESSION['user']['company_id'] ?? 1);
+    $stmt = $pdo->prepare(
+        "INSERT INTO app_settings (company_id, setting_key, setting_value) VALUES (?, 'settings_reviewed', '1')
+         ON DUPLICATE KEY UPDATE setting_value = '1'"
+    );
+    $stmt->execute([$companyId]);
+}
+
 function settings_save(PDO $pdo, array $values): array
 {
     $companyId = (int)($_SESSION['user']['company_id'] ?? 1);

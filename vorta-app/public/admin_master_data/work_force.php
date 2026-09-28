@@ -134,7 +134,7 @@ function page_url($p)
 <?php endif; ?>
 <div id="workforce-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
   <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
-    Added New Work Force
+    Add New Work Force
   </h2>
   <form method="POST" id="workforce-form">
     <?= csrf_field() ?>

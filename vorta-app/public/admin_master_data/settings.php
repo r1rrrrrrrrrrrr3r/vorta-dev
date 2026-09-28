@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
     exit;
 }
 
+settings_mark_reviewed($pdo);
+
 $target = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
 $companyStmt = $pdo->prepare('SELECT timezone FROM companies WHERE company_id = ?');
@@ -78,44 +80,57 @@ if (!isset($timezoneOptions[$companyTimezone]) && in_array($companyTimezone, tim
 <?php endif; ?>
 
 <div id="settings-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
-  <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
-    Monthly Target
+  <h2 class="text-lg font-semibold text-gray-800 mb-1" id="form-title">
+    Settings
   </h2>
+  <p class="text-sm text-gray-600 mb-6">Reporting targets and regional preferences for this company.</p>
   <form method="POST" id="settings-form">
     <?= csrf_field() ?>
     <input type="hidden" name="entity" value="settings">
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Minimum</label>
-        <input type="number" name="monthly_target_min" min="1" value="<?= (int) $target['min'] ?>"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          placeholder="Example: 50" required>
+    <div class="pb-6 mb-6 border-b border-gray-200">
+      <h3 class="text-base font-semibold text-gray-800 mb-1">Monthly Target</h3>
+      <p class="text-xs text-gray-500 mb-4">How many reports each staff member is expected to submit.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Minimum</label>
+          <input type="number" name="monthly_target_min" min="1" value="<?= (int) $target['min'] ?>"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Example: 50" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Maximum</label>
+          <input type="number" name="monthly_target_max" min="1" value="<?= (int) $target['max'] ?>"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Example: 88" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Daily Minimum</label>
+          <input type="number" name="daily_min_reports" min="1" value="<?= (int) $dailyMin ?>"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Example: 2" required>
+          <p class="text-xs text-gray-500 mt-1">Minimum reports required per staff per day.</p>
+        </div>
       </div>
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Company timezone</label>
-        <select name="timezone" required
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          <?php foreach ($timezoneOptions as $value => $label): ?>
-            <option value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" <?= $companyTimezone === $value ? 'selected' : '' ?>>
-              <?= htmlspecialchars($label) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-        <p class="text-xs text-gray-500 mt-1">Dates, reminders, and report periods use this timezone.</p>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Maximum</label>
-        <input type="number" name="monthly_target_max" min="1" value="<?= (int) $target['max'] ?>"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          placeholder="Example: 88" required>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Daily Minimum</label>
-        <input type="number" name="daily_min_reports" min="1" value="<?= (int) $dailyMin ?>"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          placeholder="Example: 2" required>
-        <p class="text-xs text-gray-500 mt-1">Minimum reports required per staff per day.</p>
+    </div>
+
+    <div class="mb-2">
+      <h3 class="text-base font-semibold text-gray-800 mb-1">Regional</h3>
+      <p class="text-xs text-gray-500 mb-4">Dates, reminders, and report periods are calculated in this timezone.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Company timezone</label>
+          <select name="timezone" required
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <?php foreach ($timezoneOptions as $value => $label): ?>
+              <option value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" <?= $companyTimezone === $value ? 'selected' : '' ?>>
+                <?= htmlspecialchars($label) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
       </div>
     </div>
 

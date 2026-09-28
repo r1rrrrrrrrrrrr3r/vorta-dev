@@ -61,68 +61,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vorta Prodtracker - Create Company</title>
+  <title>Create company - Vorta Prodtracker</title>
   <link rel="stylesheet" href="css/output.css">
   <?php include __DIR__ . '/ui_head.php'; ?>
-  <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-  body { font-family: 'Inter', sans-serif; padding-left: 0 !important; }
-  .login-card { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
-  </style>
 </head>
-<body class="min-h-screen flex items-center justify-center px-4 py-8">
-  <main class="w-full max-w-md">
-    <section class="login-card bg-white rounded-xl p-8">
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Create your company</h1>
-        <p class="text-gray-600">Set up your workspace and administrator account.</p>
+<body class="account-shell">
+  <main class="account-card">
+    <div class="account-brand">
+      <img src="../images/vorta.png" alt="Vorta">
+      <div>
+        <div class="account-brand-name">Vorta Prodtracker</div>
+        <div class="account-brand-sub">Productivity System</div>
       </div>
+    </div>
 
-      <?php if ($error): ?>
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-          <?= htmlspecialchars($error) ?>
-        </div>
-      <?php endif; ?>
+    <h1 class="account-title">Create your company</h1>
+    <p class="account-copy">Set up your workspace and administrator account.</p>
 
-      <form method="post" class="space-y-5">
-        <?= csrf_field() ?>
-        <div>
-          <label for="company_name" class="block text-sm font-medium text-gray-700 mb-1">Company name</label>
-          <input id="company_name" name="company_name" required autofocus
-            value="<?= htmlspecialchars($_POST['company_name'] ?? '') ?>"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Acme Studio">
-        </div>
-        <div>
-          <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Your name</label>
-          <input id="name" name="name" required
-            value="<?= htmlspecialchars($_POST['name'] ?? '') ?>"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Jane Doe">
-        </div>
-        <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Work email</label>
-          <input id="email" type="email" name="email" required
-            value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="you@company.com">
-        </div>
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input id="password" type="password" name="password" minlength="6" required
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="At least 6 characters">
-        </div>
-        <button type="submit"
-          class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
-          Create company
-        </button>
-      </form>
-      <p class="mt-6 text-center text-sm text-gray-600">
-        Already have an account?
-        <a href="index.php" class="font-medium text-indigo-600 hover:text-indigo-700">Sign in</a>
-      </p>
-    </section>
+    <?php if ($error): ?>
+      <div class="account-alert account-alert--error"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <form method="post">
+      <?= csrf_field() ?>
+      <div class="account-field">
+        <label class="account-label" for="company_name">Company name</label>
+        <input class="account-input" id="company_name" name="company_name" required autofocus
+          value="<?= htmlspecialchars($_POST['company_name'] ?? '') ?>" placeholder="Acme Studio">
+      </div>
+      <div class="account-field">
+        <label class="account-label" for="name">Your name</label>
+        <input class="account-input" id="name" name="name" required
+          value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" placeholder="Jane Doe">
+      </div>
+      <div class="account-field">
+        <label class="account-label" for="email">Work email</label>
+        <input class="account-input" id="email" type="email" name="email" required
+          value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="you@company.com">
+      </div>
+      <div class="account-field">
+        <label class="account-label" for="password">Password</label>
+        <input class="account-input" id="password" type="password" name="password" minlength="6" required
+          placeholder="At least 6 characters">
+      </div>
+      <button class="account-submit" type="submit">Create company</button>
+    </form>
+
+    <p class="account-foot">Already have an account? <a href="index.php">Sign in</a></p>
   </main>
 </body>
 </html>

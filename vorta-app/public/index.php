@@ -44,65 +44,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vorta Prodtracker - Login</title>
+  <title>Sign in - Vorta Prodtracker</title>
   <link rel="stylesheet" href="css/output.css">
   <?php include __DIR__ . '/ui_head.php'; ?>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body {
-      font-family: 'Inter', sans-serif;
-      padding-left: 0 !important;
-    }
-    .login-card {
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
-  </style>
 </head>
-<body class="min-h-screen flex items-center justify-center">
-  <div class="w-full max-w-md">
-    <div class="login-card bg-white rounded-xl p-8">
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Vorta Prodtracker</h1>
-        <p class="text-gray-600">Productivity System Login</p>
+<body class="account-shell">
+  <main class="account-card">
+    <div class="account-brand">
+      <img src="../images/vorta.png" alt="Vorta">
+      <div>
+        <div class="account-brand-name">Vorta Prodtracker</div>
+        <div class="account-brand-sub">Productivity System</div>
       </div>
-
-      <?php if(isset($error)): ?>
-        <div class="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">
-          <?php echo htmlspecialchars($error) ?>
-        </div>
-      <?php endif; ?>
-      <?php if ($registered): ?>
-        <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
-          Your company workspace is ready. Sign in with the administrator account you just created.
-        </div>
-      <?php endif; ?>
-
-      <form method="post" class="space-y-6">
-        <?= csrf_field() ?>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" name="email" required
-                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                 placeholder="email@example.com">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input type="password" name="password" required
-                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                 placeholder="••••••••">
-        </div>
-
-        <div>
-          <button type="submit"
-                  class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-            Sign In
-          </button>
-        </div>
-      </form>
-      <p class="mt-4 text-center text-sm"><a href="forgot_password.php" class="text-gray-500 hover:text-indigo-600">Forgot your password?</a></p>
-      <p class="mt-4 text-center text-sm"><a href="register.php" class="font-medium text-indigo-600 hover:text-indigo-700">Create a company account</a></p>
     </div>
-  </div>
+
+    <h1 class="account-title">Sign in</h1>
+    <p class="account-copy">Use your work account to continue.</p>
+
+    <?php if (isset($error)): ?>
+      <div class="account-alert account-alert--error"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+    <?php if ($registered): ?>
+      <div class="account-alert account-alert--ok">
+        Your company workspace is ready. Sign in with the administrator account you just created.
+      </div>
+    <?php endif; ?>
+
+    <form method="post">
+      <?= csrf_field() ?>
+      <div class="account-field">
+        <label class="account-label" for="email">Email</label>
+        <input class="account-input" id="email" type="email" name="email" required autofocus
+               placeholder="email@example.com">
+      </div>
+      <div class="account-field">
+        <label class="account-label" for="password">Password</label>
+        <input class="account-input" id="password" type="password" name="password" required
+               placeholder="••••••••">
+      </div>
+      <button class="account-submit" type="submit">Sign in</button>
+    </form>
+
+    <p class="account-foot"><a href="forgot_password.php">Forgot your password?</a></p>
+    <p class="account-foot">New here? <a href="register.php">Create a company account</a></p>
+  </main>
 </body>
 </html>

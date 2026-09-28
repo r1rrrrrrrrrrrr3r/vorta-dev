@@ -14,7 +14,7 @@ $tab_names = [
   'users' => 'Users',
   'employees' => 'Employees',
   'job_type' => 'Job Type',
-  'settings' => 'Monthly Target'
+  'settings' => 'Settings'
 ];
 ?>
 
@@ -35,7 +35,7 @@ $tab_names = [
         Job Type
       </a>
       <a href="?tab=settings" class="px-4 py-2 text-sm font-medium border-b-2 <?= $active_tab === 'settings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' ?>">
-        Monthly Target
+        Settings
       </a>
     </div>
   </div>

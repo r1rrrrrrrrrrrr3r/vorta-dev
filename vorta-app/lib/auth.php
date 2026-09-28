@@ -15,9 +15,9 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/config.php';
 
 function require_login() {
-  global $BASE_URL;
+  global $BASE_PATH;
   if (!isset($_SESSION['user'])) {
-    header("Location: {$BASE_URL}/index.php");
+    header("Location: {$BASE_PATH}/index.php");
     exit;
   }
 }

@@ -17,7 +17,7 @@ if (($_SESSION['user']['role'] ?? '') === 'admin') {
         (SELECT COUNT(*) FROM employees WHERE company_id = ?) AS employees,
         (SELECT COUNT(*) FROM work_force WHERE company_id = ?) AS workforces,
         (SELECT COUNT(*) FROM company_invitations WHERE company_id = ? AND accepted_at IS NULL AND expires_at > NOW()) AS pending_invites,
-        (SELECT COUNT(*) FROM app_settings WHERE company_id = ? AND setting_key IN ('monthly_target_min', 'monthly_target_max', 'daily_min_reports')) AS configured_settings");
+        (SELECT COUNT(*) FROM app_settings WHERE company_id = ? AND setting_key = 'settings_reviewed' AND setting_value = '1') AS configured_settings");
     $countStmt->execute([$company_id, $company_id, $company_id, $company_id, $company_id]);
     $setup = $countStmt->fetch() ?: [];
 }
@@ -197,7 +197,7 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
   <?php
     $setupHasTeam = !empty($setup) && ((int)$setup['users'] > 1 || (int)$setup['pending_invites'] > 0);
     $setupHasEmployees = !empty($setup) && (int)$setup['employees'] > 0;
-    $setupHasTargets = !empty($setup) && (int)$setup['configured_settings'] >= 3;
+    $setupHasTargets = !empty($setup) && (int)$setup['configured_settings'] >= 1;
   ?>
   <?php if (!empty($setup) && (!$setupHasTeam || !$setupHasEmployees || !$setupHasTargets)): ?>
     <section class="vorta-setup">
@@ -206,7 +206,7 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
       </div>
       <div class="vorta-setup__body">
         <h2 class="vorta-setup__title">Finish setting up your workspace</h2>
-        <p class="vorta-setup__subtitle">Invite your team, assign employees, and set targets before collecting reports.</p>
+        <p class="vorta-setup__subtitle">Invite your team, assign employees, and confirm your settings before collecting reports.</p>
         <div class="vorta-setup__steps">
           <a href="admin_master_data.php?tab=users" class="vorta-step <?= $setupHasTeam ? 'vorta-step--complete' : 'vorta-step--primary' ?>">
             <span class="vorta-step__num"><?= $setupHasTeam ? '✓' : '1' ?></span> Invite users<?php if ((int)($setup['pending_invites'] ?? 0) > 0): ?> (<?= (int)$setup['pending_invites'] ?> pending)<?php endif; ?>
@@ -215,7 +215,7 @@ $serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
             <span class="vorta-step__num"><?= $setupHasEmployees ? '✓' : '2' ?></span> Assign employees<?php if ($setupHasEmployees): ?> (<?= (int)$setup['employees'] ?>)<?php endif; ?>
           </a>
           <a href="admin_master_data.php?tab=settings" class="vorta-step <?= $setupHasTargets ? 'vorta-step--complete' : '' ?>">
-            <span class="vorta-step__num"><?= $setupHasTargets ? '✓' : '3' ?></span> Set targets
+            <span class="vorta-step__num"><?= $setupHasTargets ? '✓' : '3' ?></span> Configure settings
           </a>
         </div>
       </div>

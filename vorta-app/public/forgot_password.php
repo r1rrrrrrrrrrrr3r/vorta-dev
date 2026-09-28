@@ -40,21 +40,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reset password - Vorta Prodtracker</title>
   <link rel="stylesheet" href="css/output.css"><?php include __DIR__ . '/ui_head.php'; ?>
-  <style>
-    body{padding-left:0!important}.account-card{width:100%;max-width:440px;padding:32px;background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:16px;box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06),0 6px 18px -8px rgba(0,0,0,.12))}.account-title{margin:0;color:var(--text,#1f2937);font-size:26px;font-weight:700}.account-copy{margin-top:8px;color:var(--text-muted,#6b7280);font-size:14px;line-height:1.5}.account-field{margin-top:20px}.account-label{display:block;margin-bottom:6px;color:var(--text,#374151);font-size:14px;font-weight:600}.account-input{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:var(--surface,#fff);color:var(--text,#1f2937);font-size:14px}.account-submit{width:100%;margin-top:22px;padding:11px 16px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-size:14px;font-weight:700;cursor:pointer}.account-submit:hover{background:#4338ca}.account-message{margin-top:18px;padding:12px 14px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#166534;font-size:14px}
-  </style>
 </head>
-<body class="min-h-screen flex items-center justify-center px-4">
+<body class="account-shell">
   <main class="account-card">
+    <div class="account-brand">
+      <img src="../images/vorta.png" alt="Vorta">
+      <div>
+        <div class="account-brand-name">Vorta Prodtracker</div>
+        <div class="account-brand-sub">Productivity System</div>
+      </div>
+    </div>
+
     <h1 class="account-title">Reset your password</h1>
-    <p class="account-copy">Enter your account email and we’ll send a secure reset link if the account exists.</p>
-    <?php if ($message): ?><div class="account-message"><?= htmlspecialchars($message) ?></div><?php endif; ?>
+    <p class="account-copy">Enter your account email and we&rsquo;ll send a secure reset link if the account exists.</p>
+
+    <?php if ($message): ?>
+      <div class="account-alert account-alert--ok"><?= htmlspecialchars($message) ?></div>
+    <?php endif; ?>
+
     <form method="post">
       <?= csrf_field() ?>
-      <div class="account-field"><label class="account-label" for="email">Email</label><input class="account-input" id="email" type="email" name="email" required autofocus></div>
+      <div class="account-field">
+        <label class="account-label" for="email">Email</label>
+        <input class="account-input" id="email" type="email" name="email" required autofocus>
+      </div>
       <button class="account-submit" type="submit">Send reset link</button>
     </form>
-    <p class="account-copy"><a href="index.php">Back to sign in</a></p>
+
+    <p class="account-foot"><a href="index.php">Back to sign in</a></p>
   </main>
 </body>
 </html>

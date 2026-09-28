@@ -133,7 +133,7 @@ function page_url($p) {
 
 <div id="job-type-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
   <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
-    Added New Job Type
+    Add New Job Type
   </h2>
   <form method="POST">
     <?= csrf_field() ?>

@@ -331,69 +331,6 @@ function page_url($p)
   </div>
 <?php endif; ?>
 
-<div class="bg-gray-50 p-6 rounded-lg mb-8">
-  <div class="flex flex-row justify-between">
-    <h2 class="text-lg font-semibold text-gray-800 mb-4" id="emp-form-title">
-      Added Employee
-    </h2>
-    <div class="text-sm text-gray-600">Total Employees: <span class="font-medium"><?= $totalEmployees ?></span></div>
-  </div>
-  <form method="POST">
-    <?= csrf_field() ?>
-    <input type="hidden" name="entity" value="employees">
-    <input type="hidden" name="action" value="create" id="emp-action">
-    <input type="hidden" name="employee_id" value="" id="emp-id">
-    <input type="hidden" name="current_user_id" id="current-user-id" value="">
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">User</label>
-        <select name="user_id" id="user_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-          <option value="">-- Select User --</option>
-          <?php foreach ($all_users as $u): ?>
-            <?php
-            $is_used = (bool)$u['is_employee'];
-            $is_current = $u['user_id'] == ($current_user_id ?? 0);
-            ?>
-            <option value="<?= $u['user_id'] ?>"
-              <?= $is_used && !$is_current ? 'disabled' : '' ?>
-              <?= ($current_user_id ?? '') == $u['user_id'] ? 'selected' : '' ?>>
-              <?= htmlspecialchars($u['name']) ?>
-              <?php if ($is_used && !$is_current): ?> (Employee) <?php endif; ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-        <input type="text" name="name" id="emp-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
-        <select name="position" id="emp-position" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-          <option value="">-- Select Position --</option>
-          <?php foreach ($position_enum as $pos): ?>
-            <option value="<?= htmlspecialchars($pos) ?>"><?= htmlspecialchars($pos) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-        <input type="text" name="phone" id="emp-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-      </div>
-    </div>
-
-    <div class="flex gap-3">
-      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-        Save
-      </button>
-      <button type="button" id="cancel-emp" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 hidden">
-        Cancel
-      </button>
-    </div>
-  </form>
-</div>
-
 <style>
   .vorta-import { margin-bottom:32px; padding:20px; background:var(--surface,#fff); border:1px solid var(--border,#e5e7eb); border-radius:16px; box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06),0 6px 18px -8px rgba(0,0,0,.12)); }
   .vorta-import__head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; }
@@ -454,6 +391,70 @@ function page_url($p)
    label.lastChild.textContent = name ? ' ' + name : ' Choose CSV file';
  });
 </script>
+
+<div class="bg-gray-50 p-6 rounded-lg mb-8">
+  <div class="flex flex-row justify-between">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4" id="emp-form-title">
+      Add Employee
+    </h2>
+    <div class="text-sm text-gray-600">Total Employees: <span class="font-medium"><?= $totalEmployees ?></span></div>
+  </div>
+  <form method="POST">
+    <?= csrf_field() ?>
+    <input type="hidden" name="entity" value="employees">
+    <input type="hidden" name="action" value="create" id="emp-action">
+    <input type="hidden" name="employee_id" value="" id="emp-id">
+    <input type="hidden" name="current_user_id" id="current-user-id" value="">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">User</label>
+        <select name="user_id" id="user_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+          <option value="">-- Select User --</option>
+          <?php foreach ($all_users as $u): ?>
+            <?php
+            $is_used = (bool)$u['is_employee'];
+            $is_current = $u['user_id'] == ($current_user_id ?? 0);
+            ?>
+            <option value="<?= $u['user_id'] ?>"
+              <?= $is_used && !$is_current ? 'disabled' : '' ?>
+              <?= ($current_user_id ?? '') == $u['user_id'] ? 'selected' : '' ?>>
+              <?= htmlspecialchars($u['name']) ?>
+              <?php if ($is_used && !$is_current): ?> (Employee) <?php endif; ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <input type="text" name="name" id="emp-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
+        <select name="position" id="emp-position" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+          <option value="">-- Select Position --</option>
+          <?php foreach ($position_enum as $pos): ?>
+            <option value="<?= htmlspecialchars($pos) ?>"><?= htmlspecialchars($pos) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+        <input type="text" name="phone" id="emp-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        Save
+      </button>
+      <button type="button" id="cancel-emp" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 hidden">
+        Cancel
+      </button>
+    </div>
+  </form>
+</div>
+
 
 <div class="mb-6">
   <form method="GET" class="flex flex-col sm:flex-row gap-3">

@@ -213,10 +213,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
           $_SESSION['error'] = "Email is already in use.";
         } else {
           $pass_hash = password_hash($password, PASSWORD_DEFAULT);
-          $stmt = $pdo->prepare("INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)");
-          $stmt->execute([$company_id, $name, $email, $pass_hash, $role]);
-          audit_log($pdo, 'user.created', 'users', $pdo->lastInsertId(), ['role' => $role]);
-          $_SESSION['success'] = "User added successfully.";
+          $pdo->beginTransaction();
+          try {
+            $stmt = $pdo->prepare("INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$company_id, $name, $email, $pass_hash, $role]);
+            $newUserId = (int) $pdo->lastInsertId();
+
+            $empStmt = $pdo->prepare("INSERT INTO employees (company_id, user_id, name, position) VALUES (?, ?, ?, ?)");
+            $empStmt->execute([$company_id, $newUserId, $name, 'Employee']);
+            $newEmployeeId = (int) $pdo->lastInsertId();
+
+            $pdo->commit();
+
+            audit_log($pdo, 'user.created', 'users', $newUserId, ['role' => $role]);
+            audit_log($pdo, 'employee.auto_created', 'employees', $newEmployeeId, ['user_id' => $newUserId]);
+            $_SESSION['success'] = "User added successfully. A matching employee record was created, so the account is ready to use.";
+          } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+              $pdo->rollBack();
+            }
+            throw $e;
+          }
         }
       } elseif ($action === 'update') {
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
@@ -235,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
           $_SESSION['success'] = "User updated successfully.";
         }
       } else {
-        $_SESSION['error'] = "Aksi tidak diketahui.";
+        $_SESSION['error'] = "Unknown action.";
       }
     } catch (PDOException $e) {
       $_SESSION['error'] = "Failed to save data.";
@@ -426,7 +443,7 @@ function page_url($p)
 
 <div id="user-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
   <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
-    Added New User
+    Add New User
   </h2>
   <form method="POST" id="user-form">
     <?= csrf_field() ?>

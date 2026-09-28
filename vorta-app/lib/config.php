@@ -16,3 +16,12 @@ if ($configuredUrl !== '' && filter_var($configuredUrl, FILTER_VALIDATE_URL)) {
     $BASE_URL = rtrim($configuredUrl, '/');
   }
 }
+
+$BASE_PATH = '';
+if ($BASE_URL !== '') {
+  $BASE_PATH = rtrim((string) (parse_url($BASE_URL, PHP_URL_PATH) ?? ''), '/');
+}
+if ($BASE_PATH === '') {
+  $scriptDir = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+  $BASE_PATH = ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, '/');
+}
