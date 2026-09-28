@@ -253,7 +253,7 @@ include __DIR__ . '/header.php';
             </button>
             <a href="export_excel.php?recap_type=<?= urlencode($recapType) ?>&date=<?= urlencode($date) ?>&month=<?= urlencode($month) ?>&notes=<?= urlencode($notesFilter) ?>&user_id=<?= urlencode($userFilter) ?>"
               class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-              Export Excel
+              Export
             </a>
           </form>
         </div>

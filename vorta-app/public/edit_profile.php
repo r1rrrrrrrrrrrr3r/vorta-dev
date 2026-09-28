@@ -86,6 +86,12 @@ include __DIR__ . '/header.php';
             letter-spacing: .02em;
             text-transform: capitalize;
         }
+        .acct-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
     </style>
 </head>
 
@@ -113,7 +119,7 @@ include __DIR__ . '/header.php';
                         </div>
                     </div>
                     <a href="profile.php"
-                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium whitespace-nowrap">
+                        class="acct-btn px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium whitespace-nowrap">
                         <i class="fas fa-arrow-left"></i> Back to Profile
                     </a>
                 </div>
@@ -169,13 +175,13 @@ include __DIR__ . '/header.php';
                         </div>
                     <?php endif; ?>
 
-                    <div class="flex flex-wrap gap-3 pt-2 border-t border-gray-200 mt-2">
+                    <div class="flex flex-col sm:flex-row flex-wrap gap-3 pt-6 border-t border-gray-200">
                         <button type="submit"
-                            class="mt-4 px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
+                            class="acct-btn px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
                             Save Changes
                         </button>
                         <a href="profile.php"
-                            class="mt-4 px-6 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
+                            class="acct-btn px-8 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
                             Cancel
                         </a>
                     </div>
@@ -233,7 +239,7 @@ include __DIR__ . '/header.php';
 
         <div class="bg-white rounded-xl shadow-md overflow-hidden" id="security">
             <div class="p-6 md:p-8">
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800 mb-1">Security</h2>
                         <p class="text-sm text-gray-600">
@@ -241,8 +247,8 @@ include __DIR__ . '/header.php';
                         </p>
                     </div>
                     <a href="change_password.php"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium whitespace-nowrap">
-                        Change Password
+                        class="acct-btn px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium whitespace-nowrap">
+                        <i class="fas fa-key"></i> Change Password
                     </a>
                 </div>
             </div>

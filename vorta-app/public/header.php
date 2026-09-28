@@ -2,6 +2,11 @@
 require_once __DIR__ . '/../lib/auth.php';
 
 $currentPage = basename($_SERVER['PHP_SELF']);
+$serverThemePref = $_SESSION['user']['theme'] ?? 'system';
+if (!in_array($serverThemePref, ['light', 'dark', 'system'], true)) {
+    $serverThemePref = 'system';
+}
+$serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
 
 $navItems = [];
 if (isset($_SESSION['user'])) {
@@ -11,7 +16,7 @@ if (isset($_SESSION['user'])) {
         'docs'     => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         'calendar' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
         'database' => 'M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zm0 0v10c0 1.657 3.582 3 8 3s8-1.343 8-3V7',
-        'userx'    => 'M17 16l4-4m0 0l-4-4m4 4H7M12 20a8 8 0 100-16 8 8 0 000 16z',
+        'userx'    => 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M12.5 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z M18 8L23 13 M23 8L18 13',
         'clock'    => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
         'plus'     => 'M12 4v16m8-8H4',
         'user'     => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
@@ -33,12 +38,19 @@ if (isset($_SESSION['user'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="scroll-smooth" data-theme-pref="<?= htmlspecialchars($serverThemePref) ?>" data-theme="<?= htmlspecialchars($serverResolvedTheme) ?>">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vorta Productivity Tracker</title>
+  <style>
+    html{background:#f3f4f6}
+    html[data-theme="dark"]{background:#0f172a}
+    @media (prefers-color-scheme: dark){
+      html[data-theme-pref="system"]{background:#0f172a}
+    }
+  </style>
   <link rel="stylesheet" href="css/output.css">
   <?php include __DIR__ . '/ui_head.php'; ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -143,7 +155,7 @@ if (isset($_SESSION['user'])) {
 
       const themeTool = document.getElementById('vortaThemeTool');
       const layoutTool = document.getElementById('vortaLayoutTool');
-      const THEME_ORDER = ['light', 'dark', 'system'];
+      const THEME_ORDER = ['light', 'dark'];
 
       themeTool?.addEventListener('click', function (e) {
         e.stopPropagation();

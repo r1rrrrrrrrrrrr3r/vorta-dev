@@ -91,7 +91,7 @@ $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalJobTypes = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalJobTypes / $perPage);
-$sql = "SELECT * FROM job_type $whereSql ORDER BY name ASC LIMIT ? OFFSET ?";
+$sql = "SELECT * FROM job_type $whereSql ORDER BY job_type_id ASC LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
 $index = 1;
 foreach ($params as $val) {

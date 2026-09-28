@@ -92,7 +92,7 @@ $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalworkforce = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalworkforce / $perPage);
-$sql = "SELECT * FROM work_force $whereSql ORDER BY workforce_name ASC LIMIT ? OFFSET ?";
+$sql = "SELECT * FROM work_force $whereSql ORDER BY workforce_id ASC LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
 $index = 1;
 foreach ($params as $val) {

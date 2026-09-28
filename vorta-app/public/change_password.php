@@ -53,6 +53,12 @@ include __DIR__ . '/header.php';
         .pw-toggle:hover { color: var(--brand, #4f46e5); }
         .pw-toggle .fas { width: 16px; height: 16px; font-size: 15px; }
         .pw-hint { font-size: 12px; margin-top: 6px; }
+        .pw-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
     </style>
 </head>
 
@@ -128,13 +134,13 @@ include __DIR__ . '/header.php';
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
+                    <div class="flex flex-col sm:flex-row flex-wrap gap-3 pt-6 border-t border-gray-200">
                         <button type="submit" id="passwordSubmit"
-                            class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
+                            class="pw-btn px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
                             Update Password
                         </button>
                         <a href="profile.php"
-                            class="px-6 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
+                            class="pw-btn px-8 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition">
                             Cancel
                         </a>
                     </div>

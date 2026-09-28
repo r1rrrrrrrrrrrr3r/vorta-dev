@@ -141,11 +141,11 @@ $totalRow = $totalStmt->fetch();
 $totalEmployees = (int)($totalRow['cnt'] ?? 0);
 $totalPages = (int)ceil($totalEmployees / $perPage);
 $sql = "
-    SELECT e.employee_id, e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
+    SELECT e.employee_id, e.user_id, e.name, e.position, e.phone, u.name as user_name 
     FROM employees e 
     JOIN users u ON u.user_id = e.user_id 
     $whereSql 
-    ORDER BY u.name 
+    ORDER BY e.employee_id ASC 
     LIMIT ? OFFSET ?
 ";
 

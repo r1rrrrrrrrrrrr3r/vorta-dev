@@ -1,9 +1,10 @@
 <?php
-
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/mailer.php';
+require_once __DIR__ . '/../lib/settings.php';
 
 $today = date('Y-m-d');
+$dailyMin = settings_get_daily_min_reports($pdo);
 
 $stmt = $pdo->prepare("
   SELECT u.user_id, u.name, u.email, COUNT(pr.report_id) as c
@@ -11,9 +12,9 @@ $stmt = $pdo->prepare("
   LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
   WHERE u.is_active = 1
   GROUP BY u.user_id
-  HAVING c < 2
+  HAVING c < ?
 ");
-$stmt->execute([$today]);
+$stmt->execute([$today, $dailyMin]);
 $rows = $stmt->fetchAll();
 
 foreach ($rows as $r) {
@@ -23,7 +24,7 @@ foreach ($rows as $r) {
   $msg = "
     <p>Halo {$name},</p>
     <p>You have submitted only <strong>{$c}</strong> report(s) today.</p>
-    <p>The daily minimum is <strong>2 items</strong>. Please complete your daily report before 23:59.</p>
+    <p>The daily minimum is <strong>{$dailyMin} items</strong>. Please complete your daily report before 23:59.</p>
     <p>-  Productivity Tracker</p>
   ";
   send_simple_mail($email, "[Reminder] Complete Your Daily Report", $msg);

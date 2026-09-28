@@ -1,10 +1,13 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_login();
 
 $month = $_GET['month'] ?? date('Y-m');
 $start = $month . "-01";
+$target = settings_get_monthly_target($pdo);
+$dailyMin = settings_get_daily_min_reports($pdo);
 $end = date('Y-m-t', strtotime($start));
 $stmt = $pdo->prepare("
   SELECT u.user_id, u.name, u.role,
@@ -18,10 +21,19 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$start, $end, $start, $end]);
 $users = $stmt->fetchAll();
+
+$totalStaff = count($users);
+$totalReportsMonth = array_sum(array_column($users, 'total'));
+$onTrackStaff = count(array_filter($users, fn($u) => (int)$u['total'] >= $target['min']));
+$avgPerStaff = $totalStaff > 0 ? round($totalReportsMonth / $totalStaff, 1) : 0;
+$onTrackPct = $totalStaff > 0 ? round(($onTrackStaff / $totalStaff) * 100) : 0;
+
 $types = $pdo->prepare("SELECT job_type, COUNT(*) c FROM production_reports WHERE report_date BETWEEN ? AND ? GROUP BY job_type ORDER BY c DESC");
 $types->execute([$start, $end]);
 $typeRows = $types->fetchAll();
-$limit = 5; 
+$typeTotal = array_sum(array_column($typeRows, 'c'));
+
+$limit = 5;
 $page  = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
@@ -33,25 +45,108 @@ $endPage = min($totalPage, $startPage + 4);
 if ($endPage - $startPage < 4) {
     $startPage = max(1, $endPage - 4);
 }
+
+$pieColors = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#14b8a6', '#eab308'];
+
+$maxSlices = 6;
+$chartRows = array_slice($typeRows, 0, $maxSlices);
+if (count($typeRows) > $maxSlices) {
+    $rest = array_slice($typeRows, $maxSlices);
+    $chartRows[] = [
+        'job_type' => 'Others',
+        'c'        => array_sum(array_column($rest, 'c')),
+        'detail'   => implode(', ', array_column($rest, 'job_type')),
+    ];
+}
+foreach ($chartRows as $i => &$row) {
+    $row['color'] = isset($row['detail']) ? '#94a3b8' : $pieColors[$i % count($pieColors)];
+}
+unset($row);
+
+$serverThemePref = $_SESSION['user']['theme'] ?? 'system';
+if (!in_array($serverThemePref, ['light', 'dark', 'system'], true)) {
+    $serverThemePref = 'system';
+}
+$serverResolvedTheme = $serverThemePref === 'dark' ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-pref="<?= htmlspecialchars($serverThemePref) ?>" data-theme="<?= htmlspecialchars($serverResolvedTheme) ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vorta Production Dashboard</title>
-  <link rel="stylesheet" href="css/output.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-      .progress-bar { height: 8px; border-radius: 4px; }
-      .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    html{background:#f3f4f6}
+    html[data-theme="dark"]{background:#0f172a}
+    @media (prefers-color-scheme: dark){
+      html[data-theme-pref="system"]{background:#0f172a}
+    }
+    body{background-color:transparent}
+
+    .progress-bar { height: 8px; border-radius: 4px; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    .stat-card {
+      display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 14px;
+      background: var(--surface, #fff);
+      box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,.06), 0 6px 18px -8px rgba(0,0,0,.12));
+    }
+    .stat-icon { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; }
+    .stat-icon svg { width: 22px; height: 22px; }
+    .stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+    .stat-label { font-size: 12.5px; color: var(--text-muted, #6b7280); margin-top: 2px; }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      background: var(--surface-3, #f3f4f6); color: var(--text-muted, #6b7280); flex: 0 0 22px;
+    }
+
+    .chart-card { display: flex; flex-direction: column; }
+    .chart-inner { display: flex; flex-direction: column; flex: 1; padding: 24px; }
+    .chart-layout {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 20px 28px;
+      margin: auto 0;
+      padding: 12px 0;
+    }
+    .donut-wrap { position: relative; width: 168px; height: 168px; flex: 0 0 168px; }
+    .donut-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      text-align: center; pointer-events: none;
+    }
+    .donut-center .num { font-size: 24px; font-weight: 700; color: var(--text, #1f2937); line-height: 1; }
+    .donut-center .lbl { font-size: 11px; color: var(--text-muted, #6b7280); margin-top: 2px; }
+
+    .legend-list { flex: 1 1 190px; min-width: 0; max-width: 100%; }
+    .legend-row {
+      display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+      align-items: center; column-gap: 10px; padding: 7px 0;
+    }
+    .legend-row + .legend-row { border-top: 1px solid var(--border, #e5e7eb); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 999px; }
+    .legend-name {
+      font-size: 13px; color: var(--text, #1f2937);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .legend-count { font-size: 12.5px; font-weight: 600; color: var(--text, #1f2937); white-space: nowrap; }
+    .legend-pct { font-weight: 500; color: var(--text-faint, #9ca3af); margin-left: 4px; }
+
+    .chart-empty {
+      flex: 1; min-height: 160px; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text-faint, #9ca3af);
+    }
+    .chart-note {
+      margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border, #e5e7eb);
+      font-size: 13px; color: var(--text-muted, #6b7280);
+    }
   </style>
+  <link rel="stylesheet" href="css/output.css">
+  <?php include_once __DIR__ . '/ui_head.php'; ?>
 </head>
 <body class="bg-gray-50">
 <?php include __DIR__ . '/header.php'; ?>
 
 <div class="container mx-auto px-4 py-8">
-  <header class="mb-8">
+  <header class="mb-6">
     <h1 class="text-xl sm:text-2xl md:text-3xl sm:text-start text-center font-bold text-gray-800">
       Production Dashboard
     </h1>
@@ -66,7 +161,47 @@ if ($endPage - $startPage < 4) {
       </form>
     </div>
   </header>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="stat-card">
+      <div class="stat-icon bg-indigo-50">
+        <svg fill="none" stroke="#4f46e5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+      </div>
+      <div>
+        <div class="stat-value"><?= (int) $totalReportsMonth ?></div>
+        <div class="stat-label">Total Reports</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-blue-50">
+        <svg fill="none" stroke="#2563eb" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8 4 4 0 000 8z"></path></svg>
+      </div>
+      <div>
+        <div class="stat-value"><?= (int) $totalStaff ?></div>
+        <div class="stat-label">Active Staff</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-green-50">
+        <svg fill="none" stroke="#16a34a" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      </div>
+      <div>
+        <div class="stat-value"><?= (int) $onTrackStaff ?><span class="text-sm font-medium text-gray-400">/<?= (int) $totalStaff ?></span></div>
+        <div class="stat-label">On Track (<?= $onTrackPct ?>%)</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-yellow-50">
+        <svg fill="none" stroke="#ca8a04" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+      </div>
+      <div>
+        <div class="stat-value"><?= $avgPerStaff ?></div>
+        <div class="stat-label">Avg / Staff</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-white rounded-xl shadow-md overflow-hidden">
       <div class="p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Employee Performance</h2>
@@ -74,17 +209,21 @@ if ($endPage - $startPage < 4) {
           <table class="w-full">
             <thead>
               <tr class="text-left border-b border-gray-200">
+                <th class="pb-3 font-medium text-gray-600 w-10"></th>
                 <th class="pb-3 font-medium text-gray-600">Name</th>
                 <th class="pb-3 font-medium text-gray-600">Total</th>
                 <th class="pb-3 font-medium text-gray-600">Progress</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              <?php foreach ($usersPage as $u):
-                $pct = $u['total'] >= 88 ? 100 : round(($u['total'] / 88) * 100);
-                $colorClass = $u['total'] >= 50 ? 'bg-green-500' : ($u['total'] >= 30 ? 'bg-yellow-500' : 'bg-red-500');
+              <?php foreach ($usersPage as $i => $u):
+                $pct = $u['total'] >= $target['max'] ? 100 : round(($u['total'] / $target['max']) * 100);
+                $colorClass = $u['total'] >= $target['min'] ? 'bg-green-500' : ($u['total'] >= ($target['min'] * 0.6) ? 'bg-yellow-500' : 'bg-red-500');
               ?>
               <tr class="hover:bg-gray-50 transition">
+                <td class="py-4">
+                  <span class="rank-badge"><?= $offset + $i + 1 ?></span>
+                </td>
                 <td class="py-4">
                   <div class="flex items-center">
                     <span class="font-medium text-gray-800"><?php echo htmlspecialchars($u['name']) ?></span>
@@ -96,10 +235,10 @@ if ($endPage - $startPage < 4) {
                 <td class="py-4 font-medium"><?php echo (int)$u['total'] ?></td>
                 <td class="py-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                      <div class="h-2.5 rounded-full <?php echo $colorClass ?>" style="width: <?php echo $pct ?>%"></div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 progress-bar">
+                      <div class="progress-fill <?php echo $colorClass ?>" style="width: <?php echo $pct ?>%"></div>
                     </div>
-                    <span class="text-sm font-medium text-gray-600"><?php echo $pct ?>%</span>
+                    <span class="text-sm font-medium text-gray-600 w-10 text-right"><?php echo $pct ?>%</span>
                   </div>
                 </td>
               </tr>
@@ -178,49 +317,88 @@ if ($endPage - $startPage < 4) {
         <?php endif; ?>
       </div>
     </div>
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Job Type Distribution</h2>
-        <div class="h-64">
-          <canvas id="pie"></canvas>
-        </div>
-        <p class="mt-4 text-sm text-gray-500">Rule: Minimum 2 items per day per staff.</p>
+
+    <div class="bg-white rounded-xl shadow-md overflow-hidden chart-card">
+      <div class="chart-inner">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Job Type Distribution</h2>
+
+        <?php if (empty($chartRows)): ?>
+          <div class="chart-empty">No reports for this month yet.</div>
+        <?php else: ?>
+          <div class="chart-layout">
+            <div class="donut-wrap">
+              <canvas id="pie"></canvas>
+              <div class="donut-center">
+                <div class="num"><?= (int) $typeTotal ?></div>
+                <div class="lbl">reports</div>
+              </div>
+            </div>
+
+            <div class="legend-list">
+              <?php foreach ($chartRows as $t):
+                $pctType = $typeTotal > 0 ? round(($t['c'] / $typeTotal) * 100) : 0;
+              ?>
+                <div class="legend-row" title="<?= htmlspecialchars($t['detail'] ?? $t['job_type']) ?>">
+                  <span class="legend-dot" style="background: <?= $t['color'] ?>"></span>
+                  <span class="legend-name"><?= htmlspecialchars($t['job_type']) ?></span>
+                  <span class="legend-count"><?= (int) $t['c'] ?><span class="legend-pct"><?= $pctType ?>%</span></span>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <p class="chart-note">
+          Rule: Minimum <?= $dailyMin ?> item<?= $dailyMin > 1 ? 's' : '' ?> per day per staff.
+        </p>
       </div>
     </div>
-  </div> 
-</div> 
+  </div>
+</div>
 
 <script>
+  const pieLabels  = <?= json_encode(array_column($chartRows, 'job_type')) ?>;
+  const pieData    = <?= json_encode(array_map('intval', array_column($chartRows, 'c'))) ?>;
+  const pieColors  = <?= json_encode(array_column($chartRows, 'color')) ?>;
+  const pieDetails = <?= json_encode(array_map(fn($r) => $r['detail'] ?? '', $chartRows)) ?>;
 
-  const pieLabels = <?php echo json_encode(array_column($typeRows, 'job_type')); ?>;
-  const pieData = <?php echo json_encode(array_map('intval', array_column($typeRows, 'c'))); ?>;
+  function surfaceColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#ffffff';
+  }
 
-  const pieColors = [
-    'rgba(99, 102, 241, 0.7)',
-    'rgba(59, 130, 246, 0.7)',
-    'rgba(16, 185, 129, 0.7)',
-    'rgba(245, 158, 11, 0.7)',
-    'rgba(244, 63, 94, 0.7)'
-  ];
-
-  new Chart(document.getElementById('pie'), {
-    type: 'pie',
-    data: {
-      labels: pieLabels,
-      datasets: [{
-        data: pieData,
-        backgroundColor: pieColors,
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'right' }
+  if (pieData.length > 0) {
+    const pieChart = new Chart(document.getElementById('pie'), {
+      type: 'doughnut',
+      data: {
+        labels: pieLabels,
+        datasets: [{
+          data: pieData,
+          backgroundColor: pieColors,
+          borderWidth: 2,
+          borderColor: surfaceColor(),
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (ctx) => pieDetails[ctx.dataIndex] || ''
+            }
+          }
+        }
       }
-    }
-  });
+    });
+
+    document.addEventListener('vorta:uichange', function () {
+      pieChart.data.datasets[0].borderColor = surfaceColor();
+      pieChart.update('none');
+    });
+  }
 </script>
 
 <?php include __DIR__ . '/footer.php'; ?>
