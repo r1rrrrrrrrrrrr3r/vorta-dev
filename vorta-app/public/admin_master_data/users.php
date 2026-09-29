@@ -361,7 +361,7 @@ function page_url($p)
     <div class="mt-3 flex gap-2">
       <input id="invite-url" type="text" readonly value="<?= htmlspecialchars($inviteUrl, ENT_QUOTES, 'UTF-8') ?>"
         class="min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-indigo-800">
-      <button type="button" id="copy-invite" class="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Copy</button>
+      <button type="button" id="copy-invite" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Copy</button>
     </div>
   </div>
 <?php endif; ?>
@@ -372,9 +372,10 @@ function page_url($p)
   .vorta-invite__subtitle { margin:4px 0 0; font-size:14px; color:var(--text-muted,#6b7280); }
   .vorta-invite__form { display:flex; flex-wrap:wrap; gap:12px; margin-top:18px; }
   .vorta-invite__field { flex:1 1 240px; min-width:0; }
-  .vorta-invite__field input, .vorta-invite__field select { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border,#e5e7eb); border-radius:10px; background:var(--surface,#fff); color:var(--text,#1f2937); font-size:14px; }
-  .vorta-invite__submit { padding:10px 18px; border:0; border-radius:10px; background:#4f46e5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+  .vorta-invite__field input, .vorta-invite__field select { width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border,#e5e7eb); border-radius:8px; background:var(--surface,#fff); color:var(--text,#1f2937); font-size:14px; line-height:20px; }
+  .vorta-invite__submit { box-sizing:border-box; height:38px; padding:0 16px; border:0; border-radius:8px; background:#4f46e5; color:#fff; font-size:14px; font-weight:500; line-height:20px; cursor:pointer; white-space:nowrap; }
   .vorta-invite__submit:hover { background:#4338ca; }
+  .vorta-invite__actions { align-self:flex-end; }
   .vorta-invite__pending { margin-top:18px; padding-top:16px; border-top:1px solid var(--border,#e5e7eb); }
   .vorta-invite__pending-title { margin:0 0 8px; font-size:13px; font-weight:700; color:var(--text,#1f2937); }
   .vorta-invite__pending-list { display:flex; flex-wrap:wrap; gap:8px; }
@@ -399,7 +400,7 @@ function page_url($p)
         <option value="admin">Admin</option>
       </select>
     </label>
-    <div class="flex items-end">
+    <div class="vorta-invite__actions">
       <button type="submit" class="vorta-invite__submit">Create invite</button>
     </div>
   </form>
