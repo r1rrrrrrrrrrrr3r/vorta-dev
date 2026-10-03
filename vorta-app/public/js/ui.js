@@ -377,6 +377,41 @@
   document.addEventListener('vorta:uichange', syncTheme);
   syncTheme();
 
+  // ---------- Live search ----------
+  // Search inputs inside GET forms submit themselves while typing (debounced);
+  // focus and caret are restored after the page reloads.
+  const LIVE_KEY = 'vorta:live-search';
+  $$('form[method="get" i] input[type="search"]').forEach(input => {
+    let timer = null;
+    let composing = false;
+    const initial = input.value;
+    const submit = () => {
+      if (input.value.trim() === initial.trim()) return;
+      try {
+        sessionStorage.setItem(LIVE_KEY, JSON.stringify({ id: input.id, pos: input.selectionStart }));
+      } catch (e) { /* storage unavailable */ }
+      input.form.submit();
+    };
+    input.addEventListener('compositionstart', () => { composing = true; });
+    input.addEventListener('compositionend', () => { composing = false; input.dispatchEvent(new Event('input')); });
+    input.addEventListener('input', () => {
+      if (composing) return;
+      clearTimeout(timer);
+      timer = setTimeout(submit, 400);
+    });
+    input.form.addEventListener('submit', () => clearTimeout(timer));
+  });
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(LIVE_KEY) || 'null');
+    sessionStorage.removeItem(LIVE_KEY);
+    const el = saved && document.getElementById(saved.id);
+    if (el) {
+      el.focus();
+      const pos = Math.min(saved.pos ?? el.value.length, el.value.length);
+      el.setSelectionRange(pos, pos);
+    }
+  } catch (e) { /* storage unavailable */ }
+
   // ---------- Flash ----------
   function showFlash() {
     (window.VORTA_FLASH || []).forEach(f => toast(f.message, { tone: f.tone }));

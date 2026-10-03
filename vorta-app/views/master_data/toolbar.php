@@ -9,7 +9,6 @@
       <label for="md-search" class="sr-only"><?= e($mdPlaceholder) ?></label>
       <input type="search" id="md-search" name="search" class="input" value="<?= e($search) ?>" placeholder="<?= e($mdPlaceholder) ?>">
     </div>
-    <button type="submit" class="btn btn-secondary">Search</button>
     <?php if ($search): ?><a href="?tab=<?= e($mdTab) ?>" class="btn btn-ghost">Clear</a><?php endif; ?>
   </form>
   <span class="toolbar-count"><?= (int) $mdTotal ?> <?= e($mdNoun) ?></span>
