@@ -1,58 +1,52 @@
 <?php
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
+require_once __DIR__ . '/../../lib/ui.php';
 require_admin();
 
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-
-$success = $_SESSION['success'] ?? '';
-$error = $_SESSION['error'] ?? '';
-unset($_SESSION['success'], $_SESSION['error']);
 $search = trim($_GET['search'] ?? '');
-$perPage = 10;
+$perPage = 20;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['entity'] === 'work_force') {
-  $workforce_name = trim($_POST['workforce_name']);
+$backParams = ['tab' => 'work_force', 'page' => $page];
+if ($search) $backParams['search'] = $search;
+$redirect = 'admin_master_data.php?' . http_build_query($backParams);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'work_force') {
+  $workforce_name = trim($_POST['workforce_name'] ?? '');
   $action = $_POST['action'] ?? '';
   $workforce_id = (int)($_POST['workforce_id'] ?? 0);
 
   if (empty($workforce_name)) {
-    $_SESSION['error'] = "Work force name is required.";
+    flash_set('bad', "Work force name is required.");
   } else {
     try {
       if ($action === 'create') {
         $stmt = $pdo->prepare("INSERT INTO work_force (workforce_name) VALUES (?)");
         $stmt->execute([$workforce_name]);
-        $_SESSION['success'] = "Work force added successfully.";
+        flash_set('ok', "Work force added");
       } elseif ($action === 'update') {
         $stmt = $pdo->prepare("UPDATE work_force SET workforce_name = ? WHERE workforce_id = ?");
         $stmt->execute([$workforce_name, $workforce_id]);
         if ($stmt->rowCount()) {
-          $_SESSION['success'] = "Work force updated successfully.";
+          flash_set('ok', "Work force updated");
         } else {
-          $_SESSION['error'] = "Work force not found.";
+          flash_set('bad', "Work force not found.");
         }
       }
-
-      $params = ['tab' => 'work_force', 'page' => $page];
-      if ($search) $params['search'] = $search;
-      $redirect = 'admin_master_data.php?' . http_build_query($params);
-      echo "<script> window.location.href = '$redirect'; </script>";
-      exit;
     } catch (PDOException $e) {
       if ($e->getCode() == 23000) {
-        $_SESSION['error'] = $action === 'create'
+        flash_set('bad', $action === 'create'
           ? "A work force with this name already exists."
-          : "That work force name is already in use.";
+          : "That work force name is already in use.");
       } else {
-        $_SESSION['error'] = "Failed to save data.";
+        flash_set('bad', "Couldn't save. Try again.");
       }
     }
   }
+  header('Location: ' . $redirect);
+  exit;
 }
 
 if (isset($_GET['delete_work_force'])) {
@@ -62,18 +56,14 @@ if (isset($_GET['delete_work_force'])) {
     $stmt->execute([$workforce_id]);
 
     if ($stmt->rowCount()) {
-      $_SESSION['success'] = "Work force deleted successfully.";
+      flash_set('ok', "Work force deleted");
     } else {
-      $_SESSION['error'] = "Work force not found.";
+      flash_set('bad', "Work force not found.");
     }
   } catch (PDOException $e) {
-    $_SESSION['error'] = "Failed to delete data.";
+    flash_set('bad', "Couldn't delete this work force. It may still be used by reports.");
   }
-
-  $params = ['tab' => 'work_force', 'page' => $page];
-  if ($search) $params['search'] = $search;
-  $redirect = 'admin_master_data.php?' . http_build_query($params);
-  echo "<script> window.location.href = '$redirect'; </script>";
+  header('Location: ' . $redirect);
   exit;
 }
 
@@ -91,8 +81,7 @@ foreach ($params as $i => $val) {
 $totalStmt->execute();
 $totalRow = $totalStmt->fetch();
 $totalworkforce = (int)($totalRow['cnt'] ?? 0);
-$totalPages = (int)ceil($totalworkforce / $perPage);
-$sql = "SELECT * FROM work_force $whereSql ORDER BY workforce_id ASC LIMIT ? OFFSET ?";
+$sql = "SELECT * FROM work_force $whereSql ORDER BY workforce_name ASC LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
 $index = 1;
 foreach ($params as $val) {
@@ -102,230 +91,86 @@ $stmt->bindValue($index++, $perPage, PDO::PARAM_INT);
 $stmt->bindValue($index, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $workforces = $stmt->fetchAll(PDO::FETCH_ASSOC);
-function page_url($p)
-{
-  $q = $_GET;
-  $q['page'] = $p;
-  return 'admin_master_data.php?' . http_build_query($q);
-}
+
+$mdTab = 'work_force';
+$mdPlaceholder = 'Search by name…';
+$mdAddLabel = 'Add work force';
+$mdPanel = 'drawer-work-force';
+$mdTotal = $totalworkforce;
+$mdNoun = $totalworkforce === 1 ? 'work force' : 'work forces';
+include __DIR__ . '/../../views/master_data/toolbar.php';
 ?>
-
-<?php if ($success): ?>
-  <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded">
-    <?= htmlspecialchars($success) ?>
-  </div>
-<?php endif; ?>
-<?php if ($error): ?>
-  <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded">
-    <?= htmlspecialchars($error) ?>
-  </div>
-<?php endif; ?>
-<div id="workforce-form-section" class="bg-gray-50 p-6 rounded-lg mb-8">
-  <h2 class="text-lg font-semibold text-gray-800 mb-4" id="form-title">
-    Added New Work Force
-  </h2>
-  <form method="POST" id="workforce-form">
-    <input type="hidden" name="entity" value="work_force">
-    <input type="hidden" name="action" value="create" id="action-input">
-    <input type="hidden" name="workforce_id" value="" id="workforce-id-input">
-
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Work Force Name</label>
-      <input type="text" name="workforce_name" id="workforce_name"
-        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-        placeholder="Example: Inare, Antara" required>
-    </div>
-
-    <div class="flex gap-3">
-      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-        Add
-      </button>
-      <button type="button" id="cancel-edit" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 hidden">
-        Cancel
-      </button>
-    </div>
-  </form>
-</div>
-
-<div class="mb-6">
-  <form method="GET" class="flex flex-col sm:flex-row gap-3">
-    <input type="hidden" name="tab" value="work_force">
-    <input
-      type="text"
-      name="search"
-      value="<?= htmlspecialchars($search) ?>"
-      placeholder="Search Work Force..."
-      class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-      Search
-    </button>
-    <?php if ($search): ?>
-      <a href="?tab=work_force" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500">
-        Clear
-      </a>
-    <?php endif; ?>
-  </form>
-</div>
-
-<div class="bg-white rounded-xl shadow-md overflow-hidden">
-  <div class="p-6 md:p-8">
-    <h2 class="text-xl font-bold text-gray-800 mb-6">Work Force</h2>
-
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="text-left border-b border-gray-200">
-            <th class="pb-3 font-medium text-gray-600">ID</th>
-            <th class="pb-3 font-medium text-gray-600">Work Force Name</th>
-            <th class="pb-3 font-medium text-gray-600">Action</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <?php if (empty($workforces)): ?>
+<section class="card">
+  <?php if (empty($workforces)): ?>
+    <?= $search ? empty_state('No work forces match “' . $search . '”', 'Try another name or clear the search.') : empty_state('No work forces yet', 'Add the clients or projects staff report against.') ?>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Name</th><th class="col-actions"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>
+          <?php foreach ($workforces as $wf): $id = (int)$wf['workforce_id']; ?>
             <tr>
-              <td colspan="3" class="py-6 text-center text-sm text-gray-400">
-                No work forces found.
+              <td class="cell-strong"><?= e($wf['workforce_name']) ?></td>
+              <td class="col-actions">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-trigger aria-controls="wf-menu-<?= $id ?>" aria-expanded="false" aria-haspopup="menu" aria-label="Actions for <?= e($wf['workforce_name']) ?>"><?= icon('ellipsis-horizontal') ?></button>
+                <div class="menu" id="wf-menu-<?= $id ?>" role="menu" hidden>
+                  <button type="button" class="menu-item" role="menuitem" onclick='editWorkforce(<?= $id ?>, <?= e(json_encode($wf['workforce_name'])) ?>)'><?= icon('pencil') ?>Edit</button>
+                  <div class="menu-sep"></div>
+                  <a class="menu-item menu-item-danger" role="menuitem" href="<?= e(query_url(['tab' => 'work_force', 'delete_work_force' => $id], 'admin_master_data.php')) ?>"
+                    data-confirm="Delete work force?" data-confirm-message="“<?= e($wf['workforce_name']) ?>” will be removed. This can't be undone." data-confirm-text="Delete" data-confirm-tone="danger"><?= icon('trash') ?>Delete…</a>
+                </div>
               </td>
             </tr>
-          <?php else: ?>
-            <?php foreach ($workforces as $wf): ?>
-              <tr class="hover:bg-gray-50 transition">
-                <td class="py-4 whitespace-nowrap text-sm text-gray-600">
-                  <?= (int)$wf['workforce_id'] ?>
-                </td>
-                <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                  <?= htmlspecialchars($wf['workforce_name']) ?>
-                </td>
-                <td class="py-4 whitespace-nowrap space-x-1">
-                  <button
-                    type="button"
-                    onclick='editWorkforce(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
-                    class="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onclick='confirmDelete(<?= (int)$wf['workforce_id'] ?>, <?= json_encode($wf['workforce_name']) ?>)'
-                    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          <?php endif; ?>
+          <?php endforeach; ?>
         </tbody>
       </table>
     </div>
-  </div>
-</div>
+    <?= pagination($page, $perPage, $totalworkforce) ?>
+  <?php endif; ?>
+</section>
 
-<?php if ($totalPages > 1): ?>
-  <nav class="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-    <div class="text-sm text-gray-600">
-      Page <span class="font-medium"><?= $page ?></span> of <span class="font-medium"><?= $totalPages ?></span>
+<aside class="drawer" id="drawer-work-force" role="dialog" aria-modal="true" aria-labelledby="wf-drawer-title" hidden>
+  <form method="POST" id="workforce-form" action="<?= e($redirect) ?>">
+    <input type="hidden" name="entity" value="work_force">
+    <input type="hidden" name="action" value="create" id="action-input">
+    <input type="hidden" name="workforce_id" value="" id="workforce-id-input">
+    <div class="drawer-header">
+      <div class="min-w-0"><div class="drawer-eyebrow" id="form-title">Add work force</div><h2 class="drawer-title" id="wf-drawer-title">New work force</h2></div>
+      <button type="button" class="btn btn-ghost btn-icon" data-drawer-close aria-label="Close"><?= icon('x-mark') ?></button>
     </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label class="label" for="workforce_name">Name</label>
+        <input type="text" name="workforce_name" id="workforce_name" class="input" placeholder="e.g. Inare, Antara" required>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button type="button" class="btn btn-ghost" data-drawer-close>Cancel</button>
+      <button type="submit" class="btn btn-primary" id="wf-submit">Add work force</button>
+    </div>
+  </form>
+</aside>
 
-    <ul class="flex flex-wrap items-center gap-2">
-      <li>
-        <a href="<?= $page > 1 ? page_url(1) : 'javascript:void(0)' ?>"
-          class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
-          <span class="hidden sm:inline">&laquo; First</span>
-          <span class="sm:hidden">&laquo;</span>
-        </a>
-      </li>
-
-      <li>
-        <a href="<?= $page > 1 ? page_url($page - 1) : 'javascript:void(0)' ?>"
-          class="px-3 py-1 rounded border <?= $page > 1 ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
-          <span class="hidden sm:inline">&lsaquo; Prev</span>
-          <span class="sm:hidden">&lsaquo;</span>
-        </a>
-      </li>
-
-      <?php
-      $start = max(1, $page - 2);
-      $end   = min($totalPages, $page + 2);
-
-      if ($start > 1) {
-        echo '<li><a class="px-3 py-1 rounded border hover:bg-gray-100" href="' . page_url(1) . '">1</a></li>';
-        if ($start > 2) echo '<li class="px-2">...</li>';
-      }
-
-      for ($p = $start; $p <= $end; $p++): ?>
-        <li>
-          <a href="<?= page_url($p) ?>"
-            class="px-3 py-1 rounded border <?= $p === $page ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100' ?>">
-            <?= $p ?>
-          </a>
-        </li>
-      <?php endfor;
-
-      if ($end < $totalPages) {
-        if ($end < $totalPages - 1) echo '<li class="px-2">...</li>';
-        echo '<li><a class="px-3 py-1 rounded border hover:bg-gray-100" href="' . page_url($totalPages) . '">' . $totalPages . '</a></li>';
-      }
-      ?>
-
-      <li>
-        <a href="<?= $page < $totalPages ? page_url($page + 1) : 'javascript:void(0)' ?>"
-          class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
-          <span class="hidden sm:inline">Next &rsaquo;</span>
-          <span class="sm:hidden">&rsaquo;</span>
-        </a>
-      </li>
-      <li>
-        <a href="<?= $page < $totalPages ? page_url($totalPages) : 'javascript:void(0)' ?>"
-          class="px-3 py-1 rounded border <?= $page < $totalPages ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed' ?>">
-          <span class="hidden sm:inline">Last &raquo;</span>
-          <span class="sm:hidden">&raquo;</span>
-        </a>
-      </li>
-    </ul>
-  </nav>
-<?php endif; ?>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+  function resetWorkforceForm() {
+    document.getElementById('workforce-form').reset();
+    document.getElementById('form-title').textContent = 'Add work force';
+    document.getElementById('wf-drawer-title').textContent = 'New work force';
+    document.getElementById('wf-submit').textContent = 'Add work force';
+    document.getElementById('action-input').value = 'create';
+    document.getElementById('workforce-id-input').value = '';
+  }
+
   function editWorkforce(id, name) {
-    document.getElementById('form-title').textContent = 'Edit Work Force';
+    document.getElementById('form-title').textContent = 'Edit work force';
+    document.getElementById('wf-drawer-title').textContent = name;
+    document.getElementById('wf-submit').textContent = 'Save';
     document.getElementById('workforce_name').value = name;
     document.getElementById('action-input').value = 'update';
     document.getElementById('workforce-id-input').value = id;
-    document.getElementById('cancel-edit').classList.remove('hidden');
-
-    document.getElementById('workforce-form-section').scrollIntoView({
-      behavior: 'smooth',
-      block: 'center'
-    });
+    Vorta.drawer.openPanel('drawer-work-force');
   }
 
-  document.getElementById('cancel-edit')?.addEventListener('click', function() {
-    document.getElementById('workforce-form').reset();
-    document.getElementById('form-title').textContent = 'Add New Work Force';
-    document.getElementById('action-input').value = 'create';
-    document.getElementById('workforce-id-input').value = '';
-    this.classList.add('hidden');
-  });
-
-  function confirmDelete(id, name) {
-    Swal.fire({
-      title: 'Delete this record?',
-      text: `You are about to delete work force: "${name}"`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it',
-      cancelButtonText: 'Cancel'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('delete_work_force', id);
-        url.searchParams.set('tab', 'work_force');
-        window.location.href = url.toString();
-      }
-    });
-  }
+  document.getElementById('drawer-work-force').addEventListener('drawer:mode', resetWorkforceForm);
+  document.getElementById('drawer-work-force').addEventListener('drawer:close', resetWorkforceForm);
 </script>
-
-<?php include __DIR__ . '/../footer.php'; ?>

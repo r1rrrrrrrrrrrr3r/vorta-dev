@@ -60,7 +60,8 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
     }
 
     $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    $mime = mime_content_type($file['tmp_name']);
+    $image_info = @getimagesize($file['tmp_name']);
+    $mime = $image_info ? $image_info['mime'] : false;
     if (!in_array($mime, $allowed_types)) {
         die("Unsupported image format. Use JPG, PNG, or WebP.");
     }

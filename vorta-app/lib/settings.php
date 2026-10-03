@@ -28,13 +28,13 @@ function settings_save(PDO $pdo, array $values): array
     $dailyMin = isset($values['daily_min_reports']) ? (int) $values['daily_min_reports'] : null;
 
     if ($min === null || $max === null || $dailyMin === null) {
-        return ['ok' => false, 'message' => 'Semua field target wajib diisi.'];
+        return ['ok' => false, 'message' => 'All target fields are required.'];
     }
     if ($min <= 0 || $max <= 0 || $dailyMin <= 0) {
-        return ['ok' => false, 'message' => 'Nilai target harus lebih dari 0.'];
+        return ['ok' => false, 'message' => 'Targets must be greater than 0.'];
     }
     if ($min > $max) {
-        return ['ok' => false, 'message' => 'Minimum tidak boleh lebih besar dari maksimum.'];
+        return ['ok' => false, 'message' => "Minimum can't be greater than maximum."];
     }
 
     $stmt = $pdo->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)
@@ -43,5 +43,5 @@ function settings_save(PDO $pdo, array $values): array
     $stmt->execute(['monthly_target_max', (string) $max]);
     $stmt->execute(['daily_min_reports', (string) $dailyMin]);
 
-    return ['ok' => true, 'message' => 'Monthly target berhasil diupdate.'];
+    return ['ok' => true, 'message' => 'Targets saved.'];
 }

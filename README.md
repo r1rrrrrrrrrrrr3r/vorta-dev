@@ -32,11 +32,30 @@ A lightweight PHP + MySQL app to record daily production reports (min 2 items/da
 
 ## Pages
 
-- `/index.php` – login
-- `/dashboard.php` – team dashboard + charts
-- `/report_form.php` – input daily reports
-- `/reports_my.php` – personal progress + chart
-- `/admin_reports.php` – all reports + who has <2 entries today (admin only)
+- `/index.php` – sign in
+- `/dashboard.php` – staff: **Today** (attendance, today's reports, monthly progress, team ranking); admin: **Dashboard** (KPIs, staff performance, job types)
+- `/my_reports.php` – staff: own reports with month/status/search filters and a detail drawer
+- `/report_form.php`, `/edit_report.php` – new / edit report
+- `/attendance.php` – staff: check in/out, leave, absence, history
+- `/admin_reports.php` – admin: tabs `?tab=all` (all reports, filters) and `?tab=today` (today's completion)
+- `/admin_attendance.php` – admin: tabs `?tab=daily`, `?tab=monthly`, `?tab=missing` (not checked in) + Excel export
+- `/admin_master_data.php` – admin: users, employees, work forces, job types
+- `/settings.php` – admin: monthly and daily report targets
+- `/account.php` – profile, appearance (theme) and password
+
+Old URLs (`profile.php`, `edit_profile.php`, `change_password.php`, `admin_not_attendance.php`) redirect to the new pages.
+
+## Styles
+
+Tailwind CSS v4 is built with the CLI from `vorta-app/`:
+
+```
+npm install
+npm run css     # one-off minified build to public/css/output.css
+npm run build   # watch mode while developing
+```
+
+Design tokens and components live in `src/css/input.css`; page shells in `views/layout/`.
 
 ## Database schema changes
 

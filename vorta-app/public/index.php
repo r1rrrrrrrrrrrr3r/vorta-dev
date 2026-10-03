@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/ui.php';
 
+$email = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $email = $_POST['email'] ?? '';
   $password = $_POST['password'] ?? '';
@@ -20,66 +22,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: dashboard.php");
     exit;
   } else {
-    $error = "Incorrect email or password.";
+    $error = "Email or password is incorrect.";
   }
 }
+
+$layout = 'bare';
+$pageTitle = 'Sign in';
+include __DIR__ . '/../views/layout/start.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vorta Prodtracker - Login</title>
-  <link rel="stylesheet" href="css/output.css">
-  <?php include __DIR__ . '/ui_head.php'; ?>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body {
-      font-family: 'Inter', sans-serif;
-      padding-left: 0 !important;
-    }
-    .login-card {
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
-  </style>
-</head>
-<body class="min-h-screen flex items-center justify-center">
-  <div class="w-full max-w-md">
-    <div class="login-card bg-white rounded-xl p-8">
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Vorta Prodtracker</h1>
-        <p class="text-gray-600">Productivity System Login</p>
-      </div>
-
-      <?php if(isset($error)): ?>
-        <div class="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm">
-          <?php echo htmlspecialchars($error) ?>
-        </div>
-      <?php endif; ?>
-
-      <form method="post" class="space-y-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" name="email" required
-                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                 placeholder="email@example.com">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input type="password" name="password" required
-                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                 placeholder="••••••••">
-        </div>
-
-        <div>
-          <button type="submit"
-                  class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-            Sign In
-          </button>
-        </div>
-      </form>
-    </div>
+<div class="w-full max-w-sm grid gap-6">
+  <div class="flex items-center justify-center gap-3">
+    <img src="../images/vorta.png" alt="" class="size-10 object-contain">
+    <span class="text-[18px] font-extrabold">Vorta</span>
   </div>
-</body>
-</html>
+
+  <form method="post" class="card card-body grid gap-4">
+    <h1 class="text-[20px] font-bold m-0">Sign in</h1>
+
+    <?php if (isset($error)): ?>
+      <?= alert_box('bad', $error) ?>
+    <?php endif; ?>
+
+    <div class="field">
+      <label class="label" for="email">Email</label>
+      <input type="email" name="email" id="email" class="input" required autocomplete="username" autofocus
+        placeholder="name@company.com" value="<?= e($email) ?>">
+    </div>
+
+    <div class="field">
+      <label class="label" for="password">Password</label>
+      <div class="input-group">
+        <input type="password" name="password" id="password" class="input" required autocomplete="current-password">
+        <button type="button" class="btn btn-ghost btn-sm" id="toggle-password" aria-controls="password" aria-pressed="false">Show</button>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+
+  <p class="text-center text-[12px] text-muted m-0">Vorta Productivity Tracker</p>
+</div>
+<script>
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    this.textContent = show ? 'Hide' : 'Show';
+    this.setAttribute('aria-pressed', String(show));
+  });
+</script>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>

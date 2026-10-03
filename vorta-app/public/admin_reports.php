@@ -2,727 +2,291 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/ui.php';
+require_once __DIR__ . '/../lib/reports.php';
 require_admin();
 
 $detailOwnerId = null;
-$detailSelf = basename(__FILE__);
-
-function report_detail_e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
-
-function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
-{
-    $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
-            FROM production_reports pr
-            LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-            JOIN users u ON u.user_id = pr.user_id
-            WHERE pr.report_id = ?";
-    $params = [$reportId];
-    if ($ownerId !== null) {
-        $sql .= " AND pr.user_id = ?";
-        $params[] = $ownerId;
-    }
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $found = $stmt->fetch();
-    return $found ?: null;
-}
 
 if (isset($_GET['proof_image'])) {
-    $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
-    $file = $row ? basename((string)$row['proof_image']) : '';
-    $path = __DIR__ . '/../uploads/' . $file;
-    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
-    if (!$mime || strpos($mime, 'image/') !== 0) {
-        http_response_code(404);
-        exit;
-    }
-    header('Content-Type: ' . $mime);
-    header('Content-Length: ' . filesize($path));
-    header('Cache-Control: private, max-age=3600');
-    readfile($path);
-    exit;
+    report_proof_image_output($pdo, (int)$_GET['proof_image'], $detailOwnerId);
 }
 
 if (isset($_GET['detail'])) {
-    $row = report_detail_fetch($pdo, (int)$_GET['detail'], $detailOwnerId);
-    if (!$row) {
-        http_response_code(404);
-        echo '<p class="text-red-600">Report not found or access denied.</p>';
-        exit;
-    }
-
-    $status = $row['status'] ?? 'Progress';
-    $statusClass = $status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-    $timestamp = strtotime((string) $row['report_date']);
-    $dateLabel = $timestamp ? date('d M Y', $timestamp) : '-';
-    $description = trim((string) ($row['description'] ?? ''));
-    $rawLink = trim((string) ($row['proof_link'] ?? ''));
-    $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
-    $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
-    $hasImage = $imageFile !== '';
-    $imageExists = $hasImage && is_file(__DIR__ . '/../uploads/' . $imageFile);
-    $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
-
-    $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';
-    $label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:4px;';
-    $value = 'font-size:14px;font-weight:600;color:var(--text);word-break:break-word;';
-    $section = 'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;';
-    ?>
-<div style="display:flex;flex-direction:column;gap:18px;">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-    <h4 style="font-size:18px;font-weight:700;line-height:1.3;color:var(--text);word-break:break-word;"><?= report_detail_e($row['title']) ?></h4>
-    <span class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap <?= $statusClass ?>"><?= report_detail_e($status) ?></span>
-  </div>
-
-  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Date</div>
-      <div style="<?= $value ?>"><?= report_detail_e($dateLabel) ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Submitted By</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['user_name']) ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Job Type</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['job_type'] ?? '-') ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Work Force</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['workforce_name'] ?? '-') ?></div>
-    </div>
-  </div>
-
-  <div>
-    <div style="<?= $section ?>">Description</div>
-    <div style="<?= $card ?>font-size:14px;line-height:1.6;color:var(--text);word-break:break-word;">
-      <?php if ($description !== ''): ?>
-        <?= nl2br(report_detail_e($description)) ?>
-      <?php else: ?>
-        <span style="color:var(--text-faint);font-style:italic;">No description provided.</span>
-      <?php endif; ?>
-    </div>
-  </div>
-
-  <div>
-    <div style="<?= $section ?>">Proof</div>
-    <?php if ($rawLink === '' && !$hasImage): ?>
-      <div style="<?= $card ?>font-size:14px;color:var(--text-faint);font-style:italic;">No proof attached.</div>
-    <?php else: ?>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <?php if ($rawLink !== ''): ?>
-          <div style="<?= $card ?>display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div style="min-width:0;flex:1;">
-              <div style="<?= $label ?>">Link</div>
-              <?php if ($isHttp): ?>
-                <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
-                  style="font-size:14px;color:var(--brand);text-decoration:underline;word-break:break-all;"><?= report_detail_e($rawLink) ?></a>
-              <?php else: ?>
-                <span style="font-size:14px;color:var(--text);word-break:break-all;"><?= report_detail_e($rawLink) ?></span>
-              <?php endif; ?>
-            </div>
-            <?php if ($isHttp): ?>
-              <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
-                class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition whitespace-nowrap">Open</a>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
-
-        <?php if ($hasImage): ?>
-          <div style="<?= $card ?>">
-            <div style="<?= $label ?>margin-bottom:8px;">Photo</div>
-            <?php if ($imageExists): ?>
-              <a href="<?= report_detail_e($imageUrl) ?>" target="_blank" rel="noopener noreferrer">
-                <img src="<?= report_detail_e($imageUrl) ?>" alt="Proof photo" loading="lazy"
-                  onerror="this.parentNode.style.display='none';this.parentNode.nextElementSibling.style.display='block';"
-                  style="display:block;max-width:100%;max-height:300px;margin:0 auto;border-radius:10px;object-fit:contain;">
-              </a>
-              <div style="display:none;font-size:14px;color:var(--text-faint);font-style:italic;">The photo could not be loaded.</div>
-            <?php else: ?>
-              <div style="font-size:14px;color:var(--text-faint);font-style:italic;">The photo file could not be found on the server.</div>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
-      </div>
-    <?php endif; ?>
-  </div>
-</div>
-<?php
-    exit;
+    report_detail_output($pdo, (int)$_GET['detail'], $detailOwnerId, basename(__FILE__));
 }
 
-
-function report_status_info(int $count, int $min): array
-{
-  if ($count === 0) {
-    return ['No Reports', 'bg-red-100 text-red-800'];
-  }
-  if ($count < $min) {
-    return [$count . ' Report' . ($count > 1 ? 's' : ''), 'bg-yellow-100 text-yellow-800'];
-  }
-  return ['Completed', 'bg-green-100 text-green-800'];
-}
-
+$tab = ($_GET['tab'] ?? 'all') === 'today' ? 'today' : 'all';
 $dailyMin = settings_get_daily_min_reports($pdo);
-$month = $_GET['month'] ?? date('Y-m');
-if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
-  $month = date('Y-m');
-}
-$start = $month . "-01";
-$end = date('Y-m-t', strtotime($start));
-
-$limit = 5;
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$offset = ($page - 1) * $limit;
-
-$countStmt = $pdo->prepare("
-  SELECT COUNT(*)
-  FROM production_reports pr
-  JOIN users u ON u.user_id = pr.user_id
-  LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-  WHERE pr.report_date BETWEEN ? AND ?
-");
-$countStmt->execute([$start, $end]);
-$totalReports = (int)$countStmt->fetchColumn();
-$totalPages = (int)ceil($totalReports / $limit);
-
-$startPage = max(1, $page - 2);
-$endPage = min($totalPages, $startPage + 4);
-if ($endPage - $startPage < 4) {
-  $startPage = max(1, $endPage - 4);
-}
-
-$stmt = $pdo->prepare("
-  SELECT pr.*, u.name, wf.workforce_name
-  FROM production_reports pr
-  JOIN users u ON u.user_id = pr.user_id
-  LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-  WHERE pr.report_date BETWEEN ? AND ?
-  ORDER BY pr.report_date DESC, pr.report_id DESC
-  LIMIT $limit OFFSET $offset
-");
-$stmt->execute([$start, $end]);
-$rows = $stmt->fetchAll();
-
 $today = date('Y-m-d');
-$shortLimit = 10;
-$shortPage = isset($_GET['short_page']) ? max(1, (int)$_GET['short_page']) : 1;
-$shortOffset = ($shortPage - 1) * $shortLimit;
+$todayStats = report_daily_completion_stats($pdo, $today, $dailyMin);
+$missingToday = $todayStats['partial'] + $todayStats['none'];
 
-$countShort = $pdo->prepare("
-  SELECT COUNT(*)
-  FROM users u
-  WHERE u.is_active = 1 AND u.role <> 'admin'
-");
-$countShort->execute();
-$totalShort = (int)$countShort->fetchColumn();
-$totalShortPages = (int)ceil($totalShort / $shortLimit);
+if ($tab === 'all') {
+    $month = valid_month($_GET['month'] ?? null);
+    $start = $month . "-01";
+    $end = date('Y-m-t', strtotime($start));
 
-$shortStartPage = max(1, $shortPage - 2);
-$shortEndPage = min($totalShortPages, $shortStartPage + 4);
-if ($shortEndPage - $shortStartPage < 4) {
-  $shortStartPage = max(1, $shortEndPage - 4);
+    $limit = 20;
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $offset = ($page - 1) * $limit;
+
+    $q = trim((string) ($_GET['q'] ?? ''));
+    $filterUser = (int) ($_GET['user_id'] ?? 0);
+    $filterJobType = trim((string) ($_GET['job_type'] ?? ''));
+    $filterStatus = in_array($_GET['status'] ?? '', ['Progress', 'Completed'], true) ? $_GET['status'] : '';
+
+    $where = "pr.report_date BETWEEN ? AND ?";
+    $params = [$start, $end];
+    if ($q !== '') {
+        $where .= " AND (pr.title LIKE ? OR u.name LIKE ?)";
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+    }
+    if ($filterUser > 0) {
+        $where .= " AND pr.user_id = ?";
+        $params[] = $filterUser;
+    }
+    if ($filterJobType !== '') {
+        $where .= " AND pr.job_type = ?";
+        $params[] = $filterJobType;
+    }
+    if ($filterStatus !== '') {
+        $where .= " AND pr.status = ?";
+        $params[] = $filterStatus;
+    }
+    $hasFilters = $q !== '' || $filterUser > 0 || $filterJobType !== '' || $filterStatus !== '';
+
+    $countStmt = $pdo->prepare("
+      SELECT COUNT(*)
+      FROM production_reports pr
+      JOIN users u ON u.user_id = pr.user_id
+      LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
+      WHERE $where
+    ");
+    $countStmt->execute($params);
+    $totalReports = (int)$countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("
+      SELECT pr.*, u.name, wf.workforce_name
+      FROM production_reports pr
+      JOIN users u ON u.user_id = pr.user_id
+      LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
+      WHERE $where
+      ORDER BY pr.report_date DESC, pr.report_id DESC
+      LIMIT $limit OFFSET $offset
+    ");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+
+    $staffOptions = $pdo->query("SELECT user_id, name FROM users WHERE is_active = 1 ORDER BY name")->fetchAll();
+    $jobTypeOptions = $pdo->query("SELECT name FROM job_type ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
+} else {
+    $shortLimit = 20;
+    $shortPage = isset($_GET['short_page']) ? max(1, (int)$_GET['short_page']) : 1;
+    $shortOffset = ($shortPage - 1) * $shortLimit;
+
+    $countShort = $pdo->prepare("
+      SELECT COUNT(*)
+      FROM users u
+      WHERE u.is_active = 1 AND u.role <> 'admin'
+    ");
+    $countShort->execute();
+    $totalShort = (int)$countShort->fetchColumn();
+
+    $short = $pdo->prepare("
+      SELECT
+        u.user_id,
+        u.name,
+        u.email,
+        e.position,
+        COUNT(pr.report_id) AS report_count,
+        GROUP_CONCAT(DISTINCT pr.job_type ORDER BY pr.report_id SEPARATOR ', ') AS job_types,
+        GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') AS report_titles
+      FROM users u
+      LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
+      LEFT JOIN employees e ON e.user_id = u.user_id
+      WHERE u.is_active = 1 AND u.role <> 'admin'
+      GROUP BY u.user_id, u.name, u.email, e.position
+      ORDER BY report_count ASC, u.name
+      LIMIT $shortLimit OFFSET $shortOffset
+    ");
+    $short->execute([$today]);
+    $shortRows = $short->fetchAll();
 }
 
-$short = $pdo->prepare("
-  SELECT
-    u.user_id,
-    u.name,
-    u.email,
-    e.position,
-    COUNT(pr.report_id) AS report_count,
-    GROUP_CONCAT(DISTINCT pr.job_type ORDER BY pr.report_id SEPARATOR ', ') AS job_types,
-    GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') AS report_titles
-  FROM users u
-  LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-  LEFT JOIN employees e ON e.user_id = u.user_id
-  WHERE u.is_active = 1 AND u.role <> 'admin'
-  GROUP BY u.user_id, u.name, u.email, e.position
-  ORDER BY report_count ASC, u.name
-  LIMIT $shortLimit OFFSET $shortOffset
-");
-$short->execute([$today]);
-$shortRows = $short->fetchAll();
+function completion_pill(int $count, int $min): string
+{
+    if ($count >= $min) return status_pill(null, 'ok', 'Complete');
+    if ($count > 0) return status_pill(null, 'warn', $count . ' of ' . $min);
+    return status_pill('No reports');
+}
 
-$statsStmt = $pdo->prepare("
-  SELECT
-    COUNT(*) AS total_active_users,
-    COALESCE(SUM(CASE WHEN report_count >= ? THEN 1 ELSE 0 END), 0) AS completed_users,
-    COALESCE(SUM(CASE WHEN report_count > 0 AND report_count < ? THEN 1 ELSE 0 END), 0) AS partial_users,
-    COALESCE(SUM(CASE WHEN report_count = 0 THEN 1 ELSE 0 END), 0) AS zero_users
-  FROM (
-    SELECT
-      u.user_id,
-      COUNT(pr.report_id) AS report_count
-    FROM users u
-    LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-    WHERE u.is_active = 1 AND u.role <> 'admin'
-    GROUP BY u.user_id
-  ) AS user_reports
-");
-$statsStmt->execute([$dailyMin, $dailyMin, $today]);
-$stats = $statsStmt->fetch();
-
-$totalActive = (int)($stats['total_active_users'] ?? 0);
-$completedUsers = (int)($stats['completed_users'] ?? 0);
-$completionPct = $totalActive > 0 ? round(($completedUsers / $totalActive) * 100) : 0;
-
-include __DIR__ . '/header.php';
+$pageTitle = 'Reports';
+$activeNav = 'reports';
+include __DIR__ . '/../views/layout/start.php';
 ?>
+<?= page_header('Reports', 'Everything staff submitted') ?>
 
-<!DOCTYPE html>
-<html lang="en">
+<nav class="tabs" aria-label="Report views">
+  <a class="tab<?= $tab === 'all' ? ' is-active' : '' ?>" href="admin_reports.php"<?= $tab === 'all' ? ' aria-current="page"' : '' ?>>All reports</a>
+  <a class="tab<?= $tab === 'today' ? ' is-active' : '' ?>" href="admin_reports.php?tab=today"<?= $tab === 'today' ? ' aria-current="page"' : '' ?>>
+    Today's completion<?php if ($missingToday > 0): ?> <span class="tab-count"><?= $missingToday ?> missing</span><?php endif; ?>
+  </a>
+</nav>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vorta Prodtracker - Admin Reports</title>
-  <link rel="stylesheet" href="css/output.css">
-</head>
-
-<body>
-  <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6 md:p-8">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 class="text-2xl font-bold text-gray-800">All Reports</h1>
-          <form class="flex flex-col sm:flex-row items-center gap-2">
-            <input type="month" name="month" value="<?= htmlspecialchars($month) ?>"
-              class="px-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-            <button type="submit" class="px-4 py-2 w-full md:w-[68px] bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
-              Filter
-            </button>
-          </form>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="text-left border-b border-gray-200">
-                <th class="pb-3 font-medium text-gray-600">Date</th>
-                <th class="pb-3 font-medium text-gray-600">Name</th>
-                <th class="pb-3 font-medium text-gray-600">Type</th>
-                <th class="pb-3 font-medium text-gray-600">Title</th>
-                <th class="pb-3 font-medium text-gray-600">Work Force</th>
-                <th class="pb-3 font-medium text-gray-600">Status</th>
-                <th class="pb-3 font-medium text-gray-600">Proof</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <?php if (empty($rows)): ?>
-                <tr>
-                  <td colspan="7" class="py-6 text-center text-sm text-gray-400">
-                    No reports found for this month.
-                  </td>
-                </tr>
-              <?php else: ?>
-                <?php foreach ($rows as $r): ?>
-                  <tr class="hover:bg-gray-50 transition">
-                    <td class="py-4 whitespace-nowrap text-sm text-gray-600">
-                      <?= htmlspecialchars($r['report_date']) ?>
-                    </td>
-                    <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                      <?= htmlspecialchars($r['name']) ?>
-                    </td>
-                    <td class="py-4 whitespace-nowrap text-sm text-gray-800">
-                      <?= htmlspecialchars($r['job_type']) ?>
-                    </td>
-                    <td class="py-4 text-sm text-gray-800">
-                      <?= htmlspecialchars($r['title']) ?>
-                    </td>
-                    <td class="py-4 text-sm text-gray-800">
-                      <?= htmlspecialchars($r['workforce_name'] ?? '-') ?>
-                    </td>
-                    <td class="py-4 whitespace-nowrap">
-                      <span class="px-2.5 py-1 rounded-full text-xs font-medium <?= $r['status'] === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' ?>">
-                        <?= htmlspecialchars($r['status']) ?>
-                      </span>
-                    </td>
-                    <td class="py-4 whitespace-nowrap">
-                      <button onclick="openModal(<?= (int)$r['report_id'] ?>)"
-                        class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-sm transition">
-                        Detail
-                      </button>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
-
-        <?php if ($totalPages > 1): ?>
-          <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div class="text-sm text-gray-600 whitespace-nowrap">
-              Page <?= $page ?> of <?= $totalPages ?>
-            </div>
-            <nav class="flex flex-wrap justify-center gap-1">
-              <?php if ($page > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=1&short_page=<?= $shortPage ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt;&lt; First</span>
-                  <span class="sm:hidden">First</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt;&lt; First</span>
-                  <span class="sm:hidden">First</span>
-                </span>
-              <?php endif; ?>
-
-              <?php if ($page > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>&short_page=<?= $shortPage ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt; Prev</span>
-                  <span class="sm:hidden">&lt;</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt; Prev</span>
-                  <span class="sm:hidden">&lt;</span>
-                </span>
-              <?php endif; ?>
-
-              <div class="hidden xs:flex gap-1">
-                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                  <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $i ?>&short_page=<?= $shortPage ?>"
-                    class="<?= $i === $page ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 hover:bg-indigo-50' ?> px-3 py-2 border border-gray-300 rounded text-sm font-medium transition">
-                    <?= $i ?>
-                  </a>
-                <?php endfor; ?>
-              </div>
-
-              <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
-                <?= $page ?>
-              </div>
-
-              <?php if ($page < $totalPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>&short_page=<?= $shortPage ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">Next &gt;</span>
-                  <span class="sm:hidden">&gt;</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">Next &gt;</span>
-                  <span class="sm:hidden">&gt;</span>
-                </span>
-              <?php endif; ?>
-
-              <?php if ($page < $totalPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>&short_page=<?= $shortPage ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">Last &gt;&gt;</span>
-                  <span class="sm:hidden">Last</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">Last &gt;&gt;</span>
-                  <span class="sm:hidden">Last</span>
-                </span>
-              <?php endif; ?>
-            </nav>
-          </div>
-        <?php endif; ?>
+<?php if ($tab === 'all'): ?>
+  <div class="toolbar">
+    <?= period_picker('month', $month, 'month', ['page']) ?>
+    <form method="get" class="contents" data-autosubmit>
+      <input type="hidden" name="month" value="<?= e($month) ?>">
+      <div class="input-icon">
+        <?= icon('magnifying-glass') ?>
+        <label for="ar-search" class="sr-only">Search title or staff</label>
+        <input type="search" id="ar-search" name="q" class="input" placeholder="Search title or staff…" value="<?= e($q) ?>">
       </div>
-    </div>
+      <label for="ar-staff" class="sr-only">Staff</label>
+      <select id="ar-staff" name="user_id" class="select">
+        <option value="">All staff</option>
+        <?php foreach ($staffOptions as $s): ?>
+          <option value="<?= (int) $s['user_id'] ?>"<?= $filterUser === (int) $s['user_id'] ? ' selected' : '' ?>><?= e($s['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <label for="ar-type" class="sr-only">Job type</label>
+      <select id="ar-type" name="job_type" class="select">
+        <option value="">All job types</option>
+        <?php foreach ($jobTypeOptions as $jt): ?>
+          <option value="<?= e($jt) ?>"<?= $filterJobType === $jt ? ' selected' : '' ?>><?= e($jt) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <label for="ar-status" class="sr-only">Status</label>
+      <select id="ar-status" name="status" class="select">
+        <option value="">Any status</option>
+        <option value="Progress"<?= $filterStatus === 'Progress' ? ' selected' : '' ?>>In progress</option>
+        <option value="Completed"<?= $filterStatus === 'Completed' ? ' selected' : '' ?>>Completed</option>
+      </select>
+    </form>
+    <?php if ($hasFilters): ?><a class="link text-[13px]" href="<?= e(query_url(['q' => null, 'user_id' => null, 'job_type' => null, 'status' => null, 'page' => null])) ?>">Clear filters</a><?php endif; ?>
+    <span class="toolbar-count"><?= $totalReports ?> report<?= $totalReports === 1 ? '' : 's' ?></span>
+  </div>
 
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6 md:p-8">
-        <div class="flex flex-col gap-4 mb-6">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 class="text-xl font-bold text-gray-800">
-              Daily Report Completion - <?= htmlspecialchars(date('d F Y', strtotime($today))) ?>
-            </h2>
-            <button onclick="location.reload()"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium whitespace-nowrap">
-              Refresh
-            </button>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <div class="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <div class="text-gray-600">Completed</div>
-                <div class="font-bold text-green-800"><?= $completedUsers ?></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
-              <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <div>
-                <div class="text-gray-600">Partial</div>
-                <div class="font-bold text-yellow-800"><?= (int)($stats['partial_users'] ?? 0) ?></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 p-3 bg-red-50 rounded-lg">
-              <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-              <div>
-                <div class="text-gray-600">No Reports</div>
-                <div class="font-bold text-red-800"><?= (int)($stats['zero_users'] ?? 0) ?></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
-              <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
-              <div>
-                <div class="text-gray-600">Total Active</div>
-                <div class="font-bold text-gray-800"><?= $totalActive ?></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <?php if (!$shortRows): ?>
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-            <p class="text-gray-600 font-medium text-lg">No active staff found.</p>
-          </div>
-        <?php else: ?>
-          <div class="mb-6">
-            <div class="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Completion Progress</span>
-              <span><?= $completedUsers ?>/<?= $totalActive ?> employees</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div class="bg-green-600 h-2 rounded-full" style="width: <?= $completionPct ?>%"></div>
-            </div>
-          </div>
-
-          <div class="hidden md:block overflow-x-auto">
-            <table class="w-full min-w-full">
-              <thead>
-                <tr class="text-left border-b border-gray-200">
-                  <th class="pb-3 font-medium text-gray-600">Employee</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Position</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Reports</th>
-                  <th class="pb-3 font-medium text-gray-600">Submitted Work</th>
-                  <th class="pb-3 font-medium text-gray-600 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <?php foreach ($shortRows as $s):
-                  $reportCount = (int)$s['report_count'];
-                  [$statusText, $statusClass] = report_status_info($reportCount, $dailyMin);
-                ?>
-                  <tr class="hover:bg-gray-50 transition">
-                    <td class="py-4">
-                      <div class="flex flex-col">
-                        <span class="text-sm font-medium text-gray-800"><?= htmlspecialchars($s['name']) ?></span>
-                        <span class="text-xs text-gray-500"><?= htmlspecialchars($s['email']) ?></span>
-                      </div>
-                    </td>
-                    <td class="py-4 text-sm text-gray-600 text-center">
-                      <?= htmlspecialchars($s['position'] ?? '-') ?>
-                    </td>
-                    <td class="py-4 text-center">
-                      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold <?= $statusClass ?>">
-                        <?= $reportCount ?>
-                      </span>
-                    </td>
-                    <td class="py-4 text-sm text-gray-600 max-w-xs">
-                      <?php if (!empty($s['report_titles'])): ?>
-                        <div class="truncate" title="<?= htmlspecialchars($s['report_titles']) ?>">
-                          <?= htmlspecialchars($s['report_titles']) ?>
-                        </div>
-                        <div class="text-xs text-gray-500 mt-1">
-                          Types: <?= htmlspecialchars($s['job_types'] ?? 'None') ?>
-                        </div>
-                      <?php else: ?>
-                        <span class="text-gray-400">No reports submitted</span>
-                      <?php endif; ?>
-                    </td>
-                    <td class="py-4 text-center">
-                      <span class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap <?= $statusClass ?>">
-                        <?= htmlspecialchars($statusText) ?>
-                      </span>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="md:hidden space-y-4">
-            <?php foreach ($shortRows as $s):
-              $reportCount = (int)$s['report_count'];
-              [$statusText, $statusClass] = report_status_info($reportCount, $dailyMin);
+  <section class="card">
+    <?php if (empty($rows)): ?>
+      <?= $hasFilters
+          ? empty_state('No reports match these filters', 'Try another month or clear the filters.')
+          : empty_state('No reports in ' . fmt_month($month), 'Reports staff submit this month will appear here.') ?>
+    <?php else: ?>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Staff</th>
+              <th>Title</th>
+              <th>Work force</th>
+              <th>Status</th>
+              <th>Proof</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($rows as $r):
+              $hasLink = trim((string)($r['proof_link'] ?? '')) !== '';
+              $hasImage = trim((string)($r['proof_image'] ?? '')) !== '';
             ?>
-              <div class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h3 class="font-medium text-gray-800"><?= htmlspecialchars($s['name']) ?></h3>
-                    <p class="text-xs text-gray-500 mt-1"><?= htmlspecialchars($s['email']) ?></p>
-                    <p class="text-sm text-gray-600 mt-2">
-                      <span class="font-medium">Position:</span>
-                      <?= htmlspecialchars($s['position'] ?? '-') ?>
-                    </p>
-                  </div>
-                  <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold <?= $statusClass ?>">
-                    <?= $reportCount ?>
-                  </span>
-                </div>
-
-                <div class="mt-3 pt-3 border-t border-gray-100">
-                  <p class="text-xs text-gray-600 mb-1">
-                    <span class="font-medium">Submitted Work:</span>
-                  </p>
-                  <?php if (!empty($s['report_titles'])): ?>
-                    <p class="text-sm text-gray-800"><?= htmlspecialchars($s['report_titles']) ?></p>
-                    <p class="text-xs text-gray-500 mt-1">Types: <?= htmlspecialchars($s['job_types'] ?? 'None') ?></p>
-                  <?php else: ?>
-                    <p class="text-sm text-gray-400">No reports submitted</p>
-                  <?php endif; ?>
-                </div>
-
-                <div class="mt-3 flex justify-end">
-                  <span class="px-2.5 py-1 rounded-full text-xs font-medium <?= $statusClass ?>">
-                    <?= htmlspecialchars($statusText) ?>
-                  </span>
-                </div>
-              </div>
+              <tr class="is-clickable" tabindex="0" data-drawer-url="admin_reports.php?detail=<?= (int) $r['report_id'] ?>"
+                data-drawer-title="<?= e($r['title']) ?>" data-drawer-eyebrow="Report · <?= e($r['name']) ?>">
+                <td class="whitespace-nowrap"><?= e(fmt_date($r['report_date'], 'short')) ?></td>
+                <td class="whitespace-nowrap"><?= e($r['name']) ?></td>
+                <td><span class="cell-strong"><?= e($r['title']) ?></span><span class="cell-sub"><?= e($r['job_type']) ?></span></td>
+                <td><?= e($r['workforce_name'] ?? '–') ?></td>
+                <td><?= status_pill($r['status']) ?></td>
+                <td class="whitespace-nowrap text-muted">
+                  <?php if (!$hasLink && !$hasImage): ?>–<?php endif; ?>
+                  <?php if ($hasLink): ?><span role="img" aria-label="Has link" title="Link"><?= icon('link', 'size-4 inline') ?></span><?php endif; ?>
+                  <?php if ($hasImage): ?><span role="img" aria-label="Has photo" title="Photo"><?= icon('photo', 'size-4 inline') ?></span><?php endif; ?>
+                </td>
+              </tr>
             <?php endforeach; ?>
-          </div>
-        <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+      <?= pagination($page, $limit, $totalReports) ?>
+    <?php endif; ?>
+  </section>
 
-        <?php if ($totalShortPages > 1): ?>
-          <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div class="text-sm text-gray-600 whitespace-nowrap">
-              Showing <?= count($shortRows) ?> of <?= $totalShort ?> employees - Page <?= $shortPage ?> of <?= $totalShortPages ?>
+<?php else: ?>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 class="card-title">Daily completion · <?= e(fmt_date($today, 'long')) ?></h2>
+    <a class="btn btn-secondary btn-sm" href="<?= e(query_url()) ?>"><?= icon('arrow-path') ?>Refresh</a>
+  </div>
+
+  <?= kpi_strip([
+      ['label' => 'Complete', 'value' => $todayStats['complete'], 'note' => '≥ ' . $dailyMin . ' reports'],
+      ['label' => 'Partial', 'value' => $todayStats['partial']],
+      ['label' => 'No reports', 'value' => $todayStats['none'], 'tone' => $todayStats['none'] > 0 ? 'bad' : null],
+      ['label' => 'Total active', 'value' => $todayStats['total']],
+  ]) ?>
+
+  <div class="grid gap-2">
+    <?= progress_bar($todayStats['total'] > 0 ? $todayStats['complete'] / $todayStats['total'] * 100 : 0) ?>
+    <span class="text-[13px] text-muted"><?= $todayStats['complete'] ?> of <?= $todayStats['total'] ?> staff complete</span>
+  </div>
+
+  <section class="card">
+    <?php if (!$shortRows): ?>
+      <?= empty_state('No active staff') ?>
+    <?php else: ?>
+      <div class="table-wrap hidden md:block">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Staff</th>
+              <th>Position</th>
+              <th class="num">Reports</th>
+              <th>Submitted work</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($shortRows as $s): $count = (int) $s['report_count']; ?>
+              <tr>
+                <td><span class="cell-strong"><?= e($s['name']) ?></span><span class="cell-sub"><?= e($s['email']) ?></span></td>
+                <td><?= e($s['position'] ?: '–') ?></td>
+                <td class="num"><?= $count ?></td>
+                <td>
+                  <?php if ($count > 0): ?>
+                    <span class="block truncate max-w-[320px]" title="<?= e($s['report_titles']) ?>"><?= e($s['report_titles']) ?></span>
+                    <span class="cell-sub truncate max-w-[320px]">Types: <?= e($s['job_types']) ?></span>
+                  <?php else: ?>
+                    <span class="text-muted">–</span>
+                  <?php endif; ?>
+                </td>
+                <td><?= completion_pill($count, $dailyMin) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <ul class="md:hidden m-0 p-0 list-none">
+        <?php foreach ($shortRows as $s): $count = (int) $s['report_count']; ?>
+          <li class="card-body grid gap-1 border-b border-line last:border-b-0">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0"><span class="cell-strong"><?= e($s['name']) ?></span><span class="cell-sub"><?= e($s['position'] ?: $s['email']) ?></span></div>
+              <?= completion_pill($count, $dailyMin) ?>
             </div>
-            <nav class="flex flex-wrap justify-center gap-1">
-              <?php if ($shortPage > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=1"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt;&lt; First</span>
-                  <span class="sm:hidden">First</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt;&lt; First</span>
-                  <span class="sm:hidden">First</span>
-                </span>
-              <?php endif; ?>
+            <?php if ($count > 0): ?>
+              <div class="text-[13px] truncate"><?= e($s['report_titles']) ?></div>
+              <div class="text-[12px] text-muted truncate">Types: <?= e($s['job_types']) ?></div>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+      <?= pagination($shortPage, $shortLimit, $totalShort, 'short_page') ?>
+    <?php endif; ?>
+  </section>
+<?php endif; ?>
 
-              <?php if ($shortPage > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $shortPage - 1 ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt; Prev</span>
-                  <span class="sm:hidden">&lt;</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">&lt; Prev</span>
-                  <span class="sm:hidden">&lt;</span>
-                </span>
-              <?php endif; ?>
-
-              <div class="hidden xs:flex gap-1">
-                <?php for ($i = $shortStartPage; $i <= $shortEndPage; $i++): ?>
-                  <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $i ?>"
-                    class="<?= $i === $shortPage ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 hover:bg-indigo-50' ?> px-3 py-2 border border-gray-300 rounded text-sm font-medium transition">
-                    <?= $i ?>
-                  </a>
-                <?php endfor; ?>
-              </div>
-
-              <div class="xs:hidden px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded text-sm font-medium">
-                <?= $shortPage ?>
-              </div>
-
-              <?php if ($shortPage < $totalShortPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $shortPage + 1 ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">Next &gt;</span>
-                  <span class="sm:hidden">&gt;</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">Next &gt;</span>
-                  <span class="sm:hidden">&gt;</span>
-                </span>
-              <?php endif; ?>
-
-              <?php if ($shortPage < $totalShortPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page ?>&short_page=<?= $totalShortPages ?>"
-                  class="px-2 py-2 sm:px-3 bg-white text-indigo-600 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium transition whitespace-nowrap">
-                  <span class="hidden sm:inline">Last &gt;&gt;</span>
-                  <span class="sm:hidden">Last</span>
-                </a>
-              <?php else: ?>
-                <span class="px-2 py-2 sm:px-3 bg-gray-100 text-gray-400 border border-gray-300 rounded text-sm font-medium cursor-not-allowed whitespace-nowrap">
-                  <span class="hidden sm:inline">Last &gt;&gt;</span>
-                  <span class="sm:hidden">Last</span>
-                </span>
-              <?php endif; ?>
-            </nav>
-          </div>
-        <?php endif; ?>
-      </div>
-    </div>
-  </div>
-
-  <div id="reportModal" class="fixed inset-0 hidden z-50" style="background: rgba(15, 23, 42, 0.55);">
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white overflow-hidden"
-      style="width: calc(100% - 2rem); max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed);">
-        <div>
-          <p style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .8;">Production Report</p>
-          <h3 style="font-size: 17px; font-weight: 700; line-height: 1.2;">Report Detail</h3>
-        </div>
-        <button onclick="closeModal()" aria-label="Close"
-          style="width: 32px; height: 32px; border-radius: 9999px; background: rgba(255, 255, 255, .18); color: #fff; font-size: 20px; line-height: 1; cursor: pointer;">
-          &times;
-        </button>
-      </div>
-      <div id="modalContent" style="padding: 20px; overflow-y: auto;"></div>
-      <div style="padding: 12px 20px; text-align: right; border-top: 1px solid var(--border);">
-        <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium transition">
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function openModal(reportId) {
-      document.getElementById('modalContent').innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
-      document.getElementById('reportModal').classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-
-      fetch('admin_reports.php?detail=' + encodeURIComponent(reportId), {
-          credentials: 'same-origin'
-        })
-        .then(function(response) {
-          return response.text();
-        })
-        .then(function(data) {
-          document.getElementById('modalContent').innerHTML = data;
-          document.getElementById('reportModal').classList.remove('hidden');
-          document.body.style.overflow = 'hidden';
-        })
-        .catch(function() {
-          document.getElementById('modalContent').innerHTML = '<p class="text-red-600">An error occurred while loading the data</p>';
-          document.getElementById('reportModal').classList.remove('hidden');
-        });
-    }
-
-    function closeModal() {
-      document.getElementById('reportModal').classList.add('hidden');
-      document.body.style.overflow = 'auto';
-    }
-
-    document.getElementById('reportModal').addEventListener('click', function(e) {
-      if (e.target === this) closeModal();
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeModal();
-    });
-  </script>
-
-  <?php include __DIR__ . '/footer.php'; ?>
-</body>
-
-</html>
+<script>
+  document.querySelectorAll('form[data-autosubmit] select').forEach(s => s.addEventListener('change', () => s.form.submit()));
+</script>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>
