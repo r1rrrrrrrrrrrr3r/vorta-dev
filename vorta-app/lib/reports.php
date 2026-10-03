@@ -1,13 +1,15 @@
 <?php
+require_once __DIR__ . '/tenant.php';
+require_once __DIR__ . '/uploads.php';
 
 function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 {
     $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
             FROM production_reports pr
             LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-            JOIN users u ON u.user_id = pr.user_id
-            WHERE pr.report_id = ?";
-    $params = [$reportId];
+            JOIN users u ON u.user_id = pr.user_id AND u.company_id = pr.company_id
+            WHERE pr.report_id = ? AND pr.company_id = ?";
+    $params = [$reportId, current_company_id()];
     if ($ownerId !== null) {
         $sql .= " AND pr.user_id = ?";
         $params[] = $ownerId;
@@ -22,9 +24,8 @@ function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
 function report_proof_image_output(PDO $pdo, int $reportId, ?int $ownerId): never
 {
     $row = report_detail_fetch($pdo, $reportId, $ownerId);
-    $file = $row ? basename((string) $row['proof_image']) : '';
-    $path = __DIR__ . '/../uploads/' . $file;
-    $mime = ($file !== '' && is_file($path)) ? mime_content_type($path) : false;
+    $path = $row ? upload_absolute_path((string) $row['proof_image']) : null;
+    $mime = $path ? mime_content_type($path) : false;
     if (!$mime || strpos($mime, 'image/') !== 0) {
         http_response_code(404);
         exit;
@@ -65,12 +66,12 @@ function report_daily_completion_stats(PDO $pdo, string $date, int $dailyMin): a
           u.user_id,
           COUNT(pr.report_id) AS report_count
         FROM users u
-        LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-        WHERE u.is_active = 1 AND u.role <> 'admin'
+        LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.company_id = u.company_id AND pr.report_date = ?
+        WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
         GROUP BY u.user_id
       ) AS user_reports
     ");
-    $statsStmt->execute([$dailyMin, $dailyMin, $date]);
+    $statsStmt->execute([$dailyMin, $dailyMin, $date, current_company_id()]);
     $s = $statsStmt->fetch() ?: [];
     return [
         'total'    => (int) ($s['total_active_users'] ?? 0),
@@ -85,9 +86,9 @@ function report_daily_counts(PDO $pdo, int $userId, string $start, string $end):
 {
     $stmt = $pdo->prepare("SELECT DATE(report_date) d, COUNT(*) c
                            FROM production_reports
-                           WHERE user_id = ? AND report_date BETWEEN ? AND ?
+                           WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?
                            GROUP BY DATE(report_date)");
-    $stmt->execute([$userId, $start, $end]);
+    $stmt->execute([$userId, current_company_id(), $start, $end]);
     $out = [];
     foreach ($stmt->fetchAll() as $r) {
         $out[$r['d']] = (int) $r['c'];
@@ -97,7 +98,7 @@ function report_daily_counts(PDO $pdo, int $userId, string $start, string $end):
 
 function report_count_on(PDO $pdo, int $userId, string $date): int
 {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date = ?");
-    $stmt->execute([$userId, $date]);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date = ?");
+    $stmt->execute([$userId, current_company_id(), $date]);
     return (int) $stmt->fetchColumn();
 }

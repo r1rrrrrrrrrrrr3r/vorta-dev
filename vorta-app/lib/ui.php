@@ -66,11 +66,22 @@ function status_pill(?string $status, ?string $tone = null, ?string $label = nul
     return '<span class="pill pill-' . e($tone) . '">' . e($label) . '</span>';
 }
 
+/** admin dan platform_admin memakai tampilan/akses admin. */
+function is_admin_role(?string $role): bool
+{
+    return in_array($role, ['admin', 'platform_admin'], true);
+}
+
+function role_label(?string $role): string
+{
+    return ['platform_admin' => 'Platform admin', 'admin' => 'Admin', 'manager' => 'Manager'][$role] ?? 'Staff';
+}
+
 function role_pill(string $role): string
 {
-    return $role === 'admin'
-        ? '<span class="pill pill-role pill-role-admin">Admin</span>'
-        : '<span class="pill pill-role">Staff</span>';
+    return is_admin_role($role)
+        ? '<span class="pill pill-role pill-role-admin">' . e(role_label($role)) . '</span>'
+        : '<span class="pill pill-role">' . e(role_label($role)) . '</span>';
 }
 
 /** Return [label, tone]. */

@@ -2,7 +2,11 @@
 require_once __DIR__ . '/../../lib/db.php';
 require_once __DIR__ . '/../../lib/auth.php';
 require_once __DIR__ . '/../../lib/ui.php';
+require_once __DIR__ . '/../../lib/csrf.php';
+require_once __DIR__ . '/../../lib/tenant.php';
+require_once __DIR__ . '/../../lib/audit.php';
 require_admin();
+$company_id = current_company_id();
 
 $search = trim($_GET['search'] ?? '');
 $perPage = 20;
@@ -14,6 +18,7 @@ if ($search) $backParams['search'] = $search;
 $redirect = 'admin_master_data.php?' . http_build_query($backParams);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'job_type') {
+  csrf_verify();
   $name = trim($_POST['name'] ?? '');
   $action = $_POST['action'] ?? '';
   $job_type_id = (int)($_POST['job_type_id'] ?? 0);
@@ -23,12 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'job_t
   } else {
     try {
       if ($action === 'create') {
-        $stmt = $pdo->prepare("INSERT INTO job_type (name) VALUES (?)");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("INSERT INTO job_type (company_id, name) VALUES (?, ?)");
+        $stmt->execute([$company_id, $name]);
+        audit_log($pdo, 'job_type.created', 'job_type', $pdo->lastInsertId());
         flash_set('ok', "Job type added");
       } elseif ($action === 'update') {
-        $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ?");
-        $stmt->execute([$name, $job_type_id]);
+        $stmt = $pdo->prepare("UPDATE job_type SET name = ? WHERE job_type_id = ? AND company_id = ?");
+        $stmt->execute([$name, $job_type_id, $company_id]);
+        audit_log($pdo, 'job_type.updated', 'job_type', $job_type_id);
         if ($stmt->rowCount()) {
           flash_set('ok', "Job type updated");
         } else {
@@ -49,11 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'job_t
   exit;
 }
 
-if (isset($_GET['delete_job_type'])) {
-  $job_type_id = (int)$_GET['delete_job_type'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job_type'])) {
+  csrf_verify();
+  $job_type_id = (int)$_POST['delete_job_type'];
   try {
-    $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ?");
-    $stmt->execute([$job_type_id]);
+    $stmt = $pdo->prepare("DELETE FROM job_type WHERE job_type_id = ? AND company_id = ?");
+    $stmt->execute([$job_type_id, $company_id]);
+    audit_log($pdo, 'job_type.deleted', 'job_type', $job_type_id);
 
     if ($stmt->rowCount()) {
       flash_set('ok', "Job type deleted");
@@ -73,7 +82,9 @@ if ($search) {
   $where[] = "name LIKE ?";
   $params[] = "%$search%";
 }
-$whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+$where[] = "company_id = ?";
+$params[] = $company_id;
+$whereSql = "WHERE " . implode(" AND ", $where);
 $totalStmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM job_type $whereSql");
 foreach ($params as $i => $val) {
   $totalStmt->bindValue($i + 1, $val, PDO::PARAM_STR);
@@ -114,10 +125,13 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
               <td class="col-actions">
                 <button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-trigger aria-controls="jt-menu-<?= $id ?>" aria-expanded="false" aria-haspopup="menu" aria-label="Actions for <?= e($jt['name']) ?>"><?= icon('ellipsis-horizontal') ?></button>
                 <div class="menu" id="jt-menu-<?= $id ?>" role="menu" hidden>
-                  <button type="button" class="menu-item" role="menuitem" onclick='editJobType(<?= $id ?>, <?= e(json_encode($jt['name'])) ?>)'><?= icon('pencil') ?>Edit</button>
+                  <button type="button" class="menu-item" role="menuitem" onclick="editJobType(<?= $id ?>, <?= e(json_encode($jt['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)) ?>)"><?= icon('pencil') ?>Edit</button>
                   <div class="menu-sep"></div>
-                  <a class="menu-item menu-item-danger" role="menuitem" href="<?= e(query_url(['tab' => 'job_type', 'delete_job_type' => $id], 'admin_master_data.php')) ?>"
-                    data-confirm="Delete job type?" data-confirm-message="“<?= e($jt['name']) ?>” will be removed. This can't be undone." data-confirm-text="Delete" data-confirm-tone="danger"><?= icon('trash') ?>Delete…</a>
+                  <form method="POST" action="<?= e($redirect) ?>" class="contents" data-turbo-frame="_top">
+                    <?= csrf_field() ?>
+                    <button type="submit" name="delete_job_type" value="<?= $id ?>" class="menu-item menu-item-danger" role="menuitem"
+                      data-confirm="Delete job type?" data-confirm-message="“<?= e($jt['name']) ?>” will be removed. This can't be undone." data-confirm-text="Delete" data-confirm-tone="danger"><?= icon('trash') ?>Delete…</button>
+                  </form>
                 </div>
               </td>
             </tr>
@@ -132,6 +146,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 
 <aside class="drawer" id="drawer-job-type" role="dialog" aria-modal="true" aria-labelledby="jt-drawer-title" hidden>
   <form method="POST" id="jobtype-form" action="<?= e($redirect) ?>">
+    <?= csrf_field() ?>
     <input type="hidden" name="entity" value="job_type">
     <input type="hidden" name="action" value="create" id="action-input">
     <input type="hidden" name="job_type_id" value="" id="jobtype-id-input">

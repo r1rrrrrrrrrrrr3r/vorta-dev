@@ -2,10 +2,10 @@
 /** Report detail fragment for the drawer. Expects $row, $detailSelf. */
 $description = trim((string) ($row['description'] ?? ''));
 $rawLink = trim((string) ($row['proof_link'] ?? ''));
-$isHttp = (bool) preg_match('#^https?://#i', $rawLink);
-$imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
-$hasImage = $imageFile !== '';
-$imageExists = $hasImage && is_file(__DIR__ . '/../../uploads/' . $imageFile);
+$isHttp = $rawLink !== '' && filter_var($rawLink, FILTER_VALIDATE_URL)
+    && in_array(strtolower((string) parse_url($rawLink, PHP_URL_SCHEME)), ['http', 'https'], true);
+$hasImage = trim((string) ($row['proof_image'] ?? '')) !== '';
+$imageExists = $hasImage && upload_absolute_path((string) $row['proof_image']) !== null;
 $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
 ?>
 <div><?= status_pill($row['status'] ?: 'Progress') ?></div>

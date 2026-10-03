@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/xlsx.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $recapType = $_GET['recap_type'] ?? 'daily';
 $date = $_GET['date'] ?? date('Y-m-d');
@@ -21,9 +23,9 @@ if ($recapType === 'daily') {
         SELECT a.*, u.name, u.email
         FROM attendance a
         JOIN users u ON a.user_id = u.user_id
-        WHERE a.date = ?
+        WHERE a.company_id = ? AND u.company_id = a.company_id AND a.date = ?
     ";
-    $params = [$date];
+    $params = [$company_id, $date];
     if (!empty($notesFilter)) {
         $sql .= " AND a.notes = ?";
         $params[] = $notesFilter;
@@ -80,10 +82,10 @@ if ($recapType === 'monthly') {
                SUM(CASE WHEN a.status = 'Leave' THEN 1 ELSE 0 END) as leave_count,
                SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as sick
         FROM users u
-        LEFT JOIN attendance a ON a.user_id = u.user_id AND a.date BETWEEN ? AND ?
-        WHERE u.is_active = 1
+        LEFT JOIN attendance a ON a.user_id = u.user_id AND a.company_id = u.company_id AND a.date BETWEEN ? AND ?
+        WHERE u.company_id = ? AND u.is_active = 1
     ";
-    $params = [$start, $end];
+    $params = [$start, $end, $company_id];
     if (!empty($userFilter)) {
         $sql .= " AND u.user_id = ?";
         $params[] = $userFilter;
@@ -112,8 +114,8 @@ if ($recapType === 'monthly') {
     $filename = 'attendance_monthly_' . $month;
     if (!empty($userFilter)) {
 
-        $nameStmt = $pdo->prepare("SELECT name FROM users WHERE user_id = ?");
-        $nameStmt->execute([$userFilter]);
+        $nameStmt = $pdo->prepare("SELECT name FROM users WHERE user_id = ? AND company_id = ?");
+        $nameStmt->execute([$userFilter, $company_id]);
         $who = $nameStmt->fetchColumn();
         if ($who) {
             $filename .= '_' . export_slug($who);

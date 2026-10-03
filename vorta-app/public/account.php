@@ -4,7 +4,11 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/ui.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/audit.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = (int) ($_SESSION['user']['user_id'] ?? 0);
 $sections = ['profile' => 'Profile', 'appearance' => 'Appearance', 'password' => 'Password'];
@@ -14,6 +18,7 @@ if (!isset($sections[$section])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $form = $_POST['form'] ?? '';
     if ($form === 'profile') {
         $result = account_update_profile(
@@ -24,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['phone'] ?? ''
         );
         if ($result['ok']) {
+            audit_log($pdo, 'profile.updated', 'users', $user_id);
             $_SESSION['user']['name'] = trim($_POST['name']);
             $_SESSION['user']['email'] = trim($_POST['email']);
             flash_set('ok', 'Profile updated');
@@ -42,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['confirm_password'] ?? ''
         );
         if ($result['ok']) {
+            audit_log($pdo, 'password.changed', 'users', $user_id);
             flash_set('ok', 'Password changed');
         } else {
             $_SESSION['account_error'] = ['password', $result['message']];
@@ -64,27 +71,27 @@ $stmt = $pdo->prepare("
         e.position,
         e.employee_id
     FROM users u
-    LEFT JOIN employees e ON u.user_id = e.user_id
-    WHERE u.user_id = ?
+    LEFT JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+    WHERE u.user_id = ? AND u.company_id = ?
 ");
-$stmt->execute([$user_id]);
+$stmt->execute([$user_id, $company_id]);
 $user = $stmt->fetch();
 
 if (!$user) {
     die("User not found.");
 }
 
-$isStaff = $user['role'] !== 'admin';
+$isStaff = !is_admin_role($user['role']);
 $attendance = null;
 $reportCount = 0;
 $target = settings_get_monthly_target($pdo);
 if ($isStaff) {
-    $stmt = $pdo->prepare("SELECT status FROM attendance WHERE user_id = ? AND date = ?");
-    $stmt->execute([$user_id, date('Y-m-d')]);
+    $stmt = $pdo->prepare("SELECT status FROM attendance WHERE user_id = ? AND company_id = ? AND date = ?");
+    $stmt->execute([$user_id, $company_id, date('Y-m-d')]);
     $attendance = $stmt->fetch() ?: null;
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND report_date BETWEEN ? AND ?");
-    $stmt->execute([$user_id, date('Y-m-01'), date('Y-m-t')]);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?");
+    $stmt->execute([$user_id, $company_id, date('Y-m-01'), date('Y-m-t')]);
     $reportCount = (int) $stmt->fetchColumn();
 }
 
@@ -124,6 +131,7 @@ include __DIR__ . '/../views/layout/start.php';
       </section>
 
       <form method="POST" action="account.php?section=profile" class="card">
+        <?= csrf_field() ?>
         <input type="hidden" name="form" value="profile">
         <div class="card-header"><h2 class="card-title">Profile</h2></div>
         <div class="card-body grid gap-4">
@@ -170,6 +178,7 @@ include __DIR__ . '/../views/layout/start.php';
 
     <?php else: ?>
       <form method="POST" action="account.php?section=password" class="card" id="password-form">
+        <?= csrf_field() ?>
         <input type="hidden" name="form" value="password">
         <div class="card-header"><h2 class="card-title">Change password</h2></div>
         <div class="card-body grid gap-4">

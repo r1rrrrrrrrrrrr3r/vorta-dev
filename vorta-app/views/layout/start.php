@@ -17,22 +17,27 @@ $themeResolved = $themePref === 'dark' ? 'dark' : 'light';
 
 $currentUser = $_SESSION['user'] ?? null;
 $role = $currentUser['role'] ?? '';
-$hasTabbar = $layout !== 'bare' && $role === 'staff';
+$hasTabbar = $layout !== 'bare' && $currentUser && !is_admin_role($role);
 
 $nav = [];
 if ($layout !== 'bare' && $currentUser) {
-    if ($role === 'admin') {
+    if (is_admin_role($role)) {
         require_once __DIR__ . '/../../lib/attendance.php';
         $notCheckedInToday = isset($pdo) ? attendance_missing_count($pdo, date('Y-m-d')) : 0;
         $nav = [
             ['key' => 'dashboard',   'href' => 'dashboard.php',         'label' => 'Dashboard',   'icon' => 'squares'],
+        ];
+        if ($role === 'platform_admin') {
+            $nav[] = ['key' => 'companies', 'href' => 'platform_companies.php', 'label' => 'Companies', 'icon' => 'building-office'];
+        }
+        $nav = array_merge($nav, [
             ['group' => 'Data'],
             ['key' => 'reports',     'href' => 'admin_reports.php',     'label' => 'Reports',     'icon' => 'document-text'],
             ['key' => 'attendance',  'href' => 'admin_attendance.php',  'label' => 'Attendance',  'icon' => 'clock', 'badge' => $notCheckedInToday],
             ['key' => 'master_data', 'href' => 'admin_master_data.php', 'label' => 'Master data', 'icon' => 'circle-stack'],
             ['group' => 'System'],
             ['key' => 'settings',    'href' => 'settings.php',          'label' => 'Settings',    'icon' => 'cog'],
-        ];
+        ]);
     } else {
         $nav = [
             ['key' => 'today',      'href' => 'dashboard.php',  'label' => 'Today',      'icon' => 'home'],
@@ -108,7 +113,7 @@ $renderUserMenu = function (string $id) use ($userName, $userEmail, $themePref):
   <div class="sidebar-user">
     <button type="button" class="sidebar-user-btn<?= $isAccountPage ? ' is-active' : '' ?>" data-menu-trigger aria-controls="user-menu-side" aria-expanded="false" aria-haspopup="menu">
       <span class="avatar"><?= e(initials($userName)) ?></span>
-      <span class="min-w-0 flex-1"><span class="sidebar-user-name"><?= e($userName) ?></span><span class="sidebar-user-role"><?= $role === 'admin' ? 'Admin' : 'Staff' ?></span></span>
+      <span class="min-w-0 flex-1"><span class="sidebar-user-name"><?= e($userName) ?></span><span class="sidebar-user-role"><?= e(role_label($role)) ?></span></span>
       <?= icon('chevron-up-down', 'size-4 opacity-70') ?>
     </button>
     <?= $renderUserMenu('user-menu-side') ?>

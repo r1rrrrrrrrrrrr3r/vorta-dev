@@ -4,9 +4,11 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/ui.php';
 require_once __DIR__ . '/../lib/reports.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
+$company_id = current_company_id();
 $detailOwnerId = (int)$user_id;
 
 if (isset($_GET['proof_image'])) {
@@ -29,8 +31,8 @@ $dailyMin = settings_get_daily_min_reports($pdo);
 $statusFilter = in_array($_GET['status'] ?? '', ['Progress', 'Completed'], true) ? $_GET['status'] : '';
 $q = trim((string) ($_GET['q'] ?? ''));
 
-$where = "pr.user_id = ? AND pr.report_date BETWEEN ? AND ?";
-$params = [$user_id, $start, $end];
+$where = "pr.user_id = ? AND pr.company_id = ? AND pr.report_date BETWEEN ? AND ?";
+$params = [$user_id, $company_id, $start, $end];
 if ($statusFilter !== '') {
     $where .= " AND pr.status = ?";
     $params[] = $statusFilter;
@@ -48,7 +50,7 @@ $stmt = $pdo->prepare("SELECT
         pr.*,
         wf.workforce_name
     FROM production_reports pr
-    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
+    LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id AND wf.company_id = pr.company_id
     WHERE $where
     ORDER BY pr.report_date DESC, pr.report_id DESC
     LIMIT $limit OFFSET $offset");

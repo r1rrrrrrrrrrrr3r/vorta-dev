@@ -4,7 +4,9 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/ui.php';
 require_once __DIR__ . '/../lib/reports.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $detailOwnerId = null;
 
@@ -36,8 +38,8 @@ if ($tab === 'all') {
     $filterJobType = trim((string) ($_GET['job_type'] ?? ''));
     $filterStatus = in_array($_GET['status'] ?? '', ['Progress', 'Completed'], true) ? $_GET['status'] : '';
 
-    $where = "pr.report_date BETWEEN ? AND ?";
-    $params = [$start, $end];
+    $where = "pr.company_id = ? AND pr.report_date BETWEEN ? AND ?";
+    $params = [$company_id, $start, $end];
     if ($q !== '') {
         $where .= " AND (pr.title LIKE ? OR u.name LIKE ?)";
         $params[] = '%' . $q . '%';
@@ -79,8 +81,12 @@ if ($tab === 'all') {
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
-    $staffOptions = $pdo->query("SELECT user_id, name FROM users WHERE is_active = 1 ORDER BY name")->fetchAll();
-    $jobTypeOptions = $pdo->query("SELECT name FROM job_type ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
+    $staffStmt = $pdo->prepare("SELECT user_id, name FROM users WHERE company_id = ? AND is_active = 1 ORDER BY name");
+    $staffStmt->execute([$company_id]);
+    $staffOptions = $staffStmt->fetchAll();
+    $jobTypeStmt = $pdo->prepare("SELECT name FROM job_type WHERE company_id = ? ORDER BY name");
+    $jobTypeStmt->execute([$company_id]);
+    $jobTypeOptions = $jobTypeStmt->fetchAll(PDO::FETCH_COLUMN);
 } else {
     $shortLimit = 20;
     $shortPage = isset($_GET['short_page']) ? max(1, (int)$_GET['short_page']) : 1;
@@ -89,9 +95,9 @@ if ($tab === 'all') {
     $countShort = $pdo->prepare("
       SELECT COUNT(*)
       FROM users u
-      WHERE u.is_active = 1 AND u.role <> 'admin'
+      WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
     ");
-    $countShort->execute();
+    $countShort->execute([$company_id]);
     $totalShort = (int)$countShort->fetchColumn();
 
     $short = $pdo->prepare("
@@ -104,14 +110,14 @@ if ($tab === 'all') {
         GROUP_CONCAT(DISTINCT pr.job_type ORDER BY pr.report_id SEPARATOR ', ') AS job_types,
         GROUP_CONCAT(DISTINCT pr.title ORDER BY pr.report_id SEPARATOR ' | ') AS report_titles
       FROM users u
-      LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.report_date = ?
-      LEFT JOIN employees e ON e.user_id = u.user_id
-      WHERE u.is_active = 1 AND u.role <> 'admin'
+      LEFT JOIN production_reports pr ON pr.user_id = u.user_id AND pr.company_id = u.company_id AND pr.report_date = ?
+      LEFT JOIN employees e ON e.user_id = u.user_id AND e.company_id = u.company_id
+      WHERE u.company_id = ? AND u.is_active = 1 AND u.role <> 'admin'
       GROUP BY u.user_id, u.name, u.email, e.position
       ORDER BY report_count ASC, u.name
       LIMIT $shortLimit OFFSET $shortOffset
     ");
-    $short->execute([$today]);
+    $short->execute([$today, $company_id]);
     $shortRows = $short->fetchAll();
 }
 

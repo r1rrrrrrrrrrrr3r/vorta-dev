@@ -4,13 +4,16 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/ui.php';
 require_once __DIR__ . '/../lib/reports.php';
+require_once __DIR__ . '/../lib/csrf.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_login();
+$company_id = current_company_id();
 
 $user_id = $_SESSION['user']['user_id'];
 $monthlyTarget = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
-$stmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ?");
-$stmt->execute([$user_id]);
+$stmt = $pdo->prepare("SELECT employee_id FROM employees WHERE user_id = ? AND company_id = ?");
+$stmt->execute([$user_id, $company_id]);
 $employee = $stmt->fetch();
 
 if (!$employee) {
@@ -19,14 +22,16 @@ if (!$employee) {
 
 $employee_id = $employee['employee_id'];
 
-$stmt = $pdo->query("SELECT workforce_id, workforce_name FROM work_force ORDER BY workforce_name");
+$stmt = $pdo->prepare("SELECT workforce_id, workforce_name FROM work_force WHERE company_id = ? ORDER BY workforce_name");
+$stmt->execute([$company_id]);
 $work_forces = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt = $pdo->query("SELECT job_type_id, name FROM job_type ORDER BY name");
+$stmt = $pdo->prepare("SELECT job_type_id, name FROM job_type WHERE company_id = ? ORDER BY name");
+$stmt->execute([$company_id]);
 $job_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt = $pdo->prepare("SELECT workforce_id FROM production_reports WHERE user_id = ? AND workforce_id IS NOT NULL ORDER BY report_date DESC, report_id DESC LIMIT 1");
-$stmt->execute([$user_id]);
+$stmt = $pdo->prepare("SELECT workforce_id FROM production_reports WHERE user_id = ? AND company_id = ? AND workforce_id IS NOT NULL ORDER BY report_date DESC, report_id DESC LIMIT 1");
+$stmt->execute([$user_id, $company_id]);
 $lastWorkforceId = (int) ($stmt->fetchColumn() ?: 0) ?: null;
 
 $todayCount = report_count_on($pdo, (int) $user_id, date('Y-m-d'));
@@ -43,6 +48,7 @@ include __DIR__ . '/../views/layout/start.php';
 
 <div class="grid gap-4 lg:grid-cols-[1fr_300px] items-start">
   <form action="save_report.php" method="POST" enctype="multipart/form-data" class="card">
+    <?= csrf_field() ?>
     <?php include __DIR__ . '/../views/reports/form_fields.php'; ?>
     <div class="card-footer justify-end">
       <a class="btn btn-ghost" href="my_reports.php">Cancel</a>

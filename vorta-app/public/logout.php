@@ -14,5 +14,5 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 require_once __DIR__ . '/../lib/config.php';
-header("Location: {$BASE_URL}/index.php");
+header("Location: {$BASE_PATH}/index.php");
 exit;

@@ -1,6 +1,32 @@
 <?php
+require_once __DIR__ . '/../lib/csrf.php';
+
 $uiTheme = $_SESSION['user']['theme'] ?? '';
+$uiCsrfToken = csrf_token();
 ?>
+<?= csrf_meta() ?>
+<script>
+  // Semua fetch POST same-origin otomatis membawa header X-CSRF-Token (dibaca dari meta, jadi tetap benar setelah navigasi Turbo).
+  (function () {
+    if (window.__vortaCsrfFetch || !window.fetch) return;
+    window.__vortaCsrfFetch = true;
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      init = init || {};
+      var method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var sameOrigin = true;
+      try { sameOrigin = new URL(url, location.href).origin === location.origin; } catch (e) {}
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      if (method !== 'GET' && method !== 'HEAD' && sameOrigin && meta) {
+        var headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+        if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', meta.content);
+        init = Object.assign({}, init, { headers: headers });
+      }
+      return nativeFetch(input, init);
+    };
+  })();
+</script>
 <script>
   (function () {
     var serverTheme = <?= json_encode($uiTheme ?: null) ?>;
@@ -34,6 +60,8 @@ $uiTheme = $_SESSION['user']['theme'] ?? '';
     root.setAttribute('data-theme', resolveTheme(themePref));
 
     function persist(body) {
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      body += '&csrf_token=' + encodeURIComponent(csrfMeta ? csrfMeta.content : <?= json_encode($uiCsrfToken) ?>);
       fetch('save_preferences.php', {
         method: 'POST',
         headers: {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/tenant.php';
 
 const ATTENDANCE_AWAY_STATUSES = ['Leave', 'Sick', 'Others', 'Absent', 'Forgot'];
 
@@ -59,12 +60,13 @@ function attendance_missing_count(PDO $pdo, string $date): int
     $stmt = $pdo->prepare("
         SELECT COUNT(*)
         FROM users u
-        JOIN employees e ON u.user_id = e.user_id
-        LEFT JOIN attendance a ON u.user_id = a.user_id AND a.date = ?
-        WHERE u.role != 'admin'
+        JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+        LEFT JOIN attendance a ON u.user_id = a.user_id AND a.company_id = u.company_id AND a.date = ?
+        WHERE u.company_id = ?
+          AND u.role != 'admin'
           AND a.user_id IS NULL
     ");
-    $stmt->execute([$date]);
+    $stmt->execute([$date, current_company_id()]);
     return (int) $stmt->fetchColumn();
 }
 
@@ -77,8 +79,8 @@ function attendance_can_input_absence(?array $row): bool
 
 function attendance_is_intern(PDO $pdo, int $userId): bool
 {
-    $stmt = $pdo->prepare("SELECT position FROM employees WHERE user_id = ?");
-    $stmt->execute([$userId]);
+    $stmt = $pdo->prepare("SELECT position FROM employees WHERE user_id = ? AND company_id = ?");
+    $stmt->execute([$userId, current_company_id()]);
     $employee = $stmt->fetch();
     if (!$employee) return false;
     $position = strtolower(trim((string) $employee['position']));

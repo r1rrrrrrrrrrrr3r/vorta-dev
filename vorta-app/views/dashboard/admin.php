@@ -5,6 +5,35 @@ $min = (int) $target['min'];
 ?>
 <?= page_header('Dashboard', 'Production overview', period_picker('month', $month)) ?>
 
+<?php
+$setupHasTeam = !empty($setup) && ((int) $setup['users'] > 1 || (int) $setup['pending_invites'] > 0);
+$setupHasEmployees = !empty($setup) && (int) $setup['employees'] > 0;
+$setupHasTargets = !empty($setup) && (int) $setup['configured_settings'] >= 1;
+?>
+<?php if (!empty($setup) && (!$setupHasTeam || !$setupHasEmployees || !$setupHasTargets)):
+  $setupSteps = [
+      [$setupHasTeam, 'admin_master_data.php?tab=users', 'Invite users' . ((int) ($setup['pending_invites'] ?? 0) > 0 ? ' (' . (int) $setup['pending_invites'] . ' pending)' : '')],
+      [$setupHasEmployees, 'admin_master_data.php?tab=employees', 'Assign employees' . ($setupHasEmployees ? ' (' . (int) $setup['employees'] . ')' : '')],
+      [$setupHasTargets, 'settings.php', 'Configure settings'],
+  ];
+  $firstOpen = null;
+  foreach ($setupSteps as $i => $st) { if (!$st[0]) { $firstOpen = $i; break; } }
+?>
+  <section class="card card-body mb-4 grid gap-3" aria-labelledby="setup-title">
+    <div>
+      <h2 class="card-title" id="setup-title">Finish setting up your workspace</h2>
+      <p class="m-0 mt-1 text-muted text-[13px]">Invite your team, assign employees, and confirm your settings before collecting reports.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <?php foreach ($setupSteps as $i => [$done, $href, $label]): ?>
+        <a href="<?= e($href) ?>" class="btn btn-sm <?= $done ? 'btn-secondary' : ($i === $firstOpen ? 'btn-primary' : 'btn-secondary') ?>">
+          <?= $done ? icon('check-circle', 'size-4 text-ok') : '<span class="font-bold">' . ($i + 1) . '</span>' ?><?= e($label) ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  </section>
+<?php endif; ?>
+
 <?= kpi_strip([
     ['label' => 'Reports', 'value' => (int) $totalReportsMonth, 'note' => fmt_month($month)],
     ['label' => 'Active staff', 'value' => (int) $totalStaff],

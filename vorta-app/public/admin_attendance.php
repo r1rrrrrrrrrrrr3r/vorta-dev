@@ -3,7 +3,9 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/ui.php';
 require_once __DIR__ . '/../lib/attendance.php';
+require_once __DIR__ . '/../lib/tenant.php';
 require_admin();
+$company_id = current_company_id();
 
 $tab = $_GET['tab'] ?? null;
 if (!in_array($tab, ['daily', 'monthly', 'missing'], true)) {
@@ -58,8 +60,8 @@ if ($tab === 'daily') {
   $dailyPage = isset($_GET['daily_page']) ? max(1, (int)$_GET['daily_page']) : 1;
   $dailyOffset = ($dailyPage - 1) * $limitDaily;
 
-  $whereDaily = "a.date = ?";
-  $paramsDaily = [$date];
+  $whereDaily = "a.company_id = ? AND u.company_id = a.company_id AND a.date = ?";
+  $paramsDaily = [$company_id, $date];
   if (!empty($notesFilter)) {
     $whereDaily .= " AND a.notes = ?";
     $paramsDaily[] = $notesFilter;
@@ -84,8 +86,8 @@ if ($tab === 'daily') {
   $stmt->execute($paramsDaily);
   $daily = $stmt->fetchAll();
 
-  $kpiStmt = $pdo->prepare("SELECT status, COUNT(*) c FROM attendance WHERE date = ? GROUP BY status");
-  $kpiStmt->execute([$date]);
+  $kpiStmt = $pdo->prepare("SELECT status, COUNT(*) c FROM attendance WHERE company_id = ? AND date = ? GROUP BY status");
+  $kpiStmt->execute([$company_id, $date]);
   $dayCounts = [];
   foreach ($kpiStmt->fetchAll() as $r) {
     $dayCounts[(string) $r['status']] = (int) $r['c'];
@@ -98,11 +100,12 @@ if ($tab === 'daily') {
   $monthlyPage = isset($_GET['monthly_page']) ? max(1, (int)$_GET['monthly_page']) : 1;
   $monthlyOffset = ($monthlyPage - 1) * $limitMonthly;
 
-  $usersStmt = $pdo->query("SELECT user_id, name FROM users WHERE is_active = 1 ORDER BY name");
+  $usersStmt = $pdo->prepare("SELECT user_id, name FROM users WHERE company_id = ? AND is_active = 1 ORDER BY name");
+  $usersStmt->execute([$company_id]);
   $users = $usersStmt->fetchAll();
 
-  $sqlCountMonthly = "SELECT COUNT(*) FROM users WHERE is_active = 1";
-  $paramsMonthly = [];
+  $sqlCountMonthly = "SELECT COUNT(*) FROM users WHERE company_id = ? AND is_active = 1";
+  $paramsMonthly = [$company_id];
   if (!empty($userFilter)) {
     $sqlCountMonthly .= " AND user_id = ?";
     $paramsMonthly[] = $userFilter;
@@ -133,10 +136,10 @@ if ($tab === 'daily') {
              SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as sick,
              COUNT(a.attendance_id) as total_records
       FROM users u
-      LEFT JOIN attendance a ON a.user_id = u.user_id AND a.date BETWEEN ? AND ?
-      WHERE u.is_active = 1
+      LEFT JOIN attendance a ON a.user_id = u.user_id AND a.company_id = u.company_id AND a.date BETWEEN ? AND ?
+      WHERE u.company_id = ? AND u.is_active = 1
   ";
-  $paramsMonthlyQuery = [$start, $end];
+  $paramsMonthlyQuery = [$start, $end, $company_id];
   if (!empty($userFilter)) {
     $sqlMonthly .= " AND u.user_id = ?";
     $paramsMonthlyQuery[] = $userFilter;
@@ -166,10 +169,10 @@ if ($tab === 'daily') {
              SUM(CASE WHEN a.status = 'Leave' THEN 1 ELSE 0 END) as total_leave,
              SUM(CASE WHEN a.status = 'Sick' THEN 1 ELSE 0 END) as total_sick
       FROM attendance a
-      WHERE a.date BETWEEN ? AND ?
+      WHERE a.company_id = ? AND a.date BETWEEN ? AND ?
   ";
   $totalStmt = $pdo->prepare($sqlTotalMonthly);
-  $totalStmt->execute([$start, $end]);
+  $totalStmt->execute([$company_id, $start, $end]);
   $monthlyTotals = $totalStmt->fetch();
 } else {
   // Not checked in (dipindah dari admin_not_attendance.php)
@@ -185,16 +188,17 @@ if ($tab === 'daily') {
           u.email,
           e.position
       FROM users u
-      JOIN employees e ON u.user_id = e.user_id
-      LEFT JOIN attendance a ON u.user_id = a.user_id AND a.date = ?
-      WHERE u.role != 'admin'
+      JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+      LEFT JOIN attendance a ON u.user_id = a.user_id AND a.company_id = u.company_id AND a.date = ?
+      WHERE u.company_id = ? AND u.role != 'admin'
         AND a.user_id IS NULL
       ORDER BY e.position, u.name
       LIMIT ? OFFSET ?
   ");
   $stmt->bindValue(1, $date, PDO::PARAM_STR);
-  $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-  $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+  $stmt->bindValue(2, $company_id, PDO::PARAM_INT);
+  $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+  $stmt->bindValue(4, $offset, PDO::PARAM_INT);
   $stmt->execute();
   $users_not_checked_in = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -202,20 +206,20 @@ if ($tab === 'daily') {
       SELECT COUNT(*)
       FROM users u
       JOIN employees e ON u.user_id = e.user_id
-      WHERE u.role != 'admin'
+      WHERE u.company_id = ? AND u.role != 'admin'
   ");
-  $totalEmpStmt->execute();
+  $totalEmpStmt->execute([$company_id]);
   $total_employees = (int) $totalEmpStmt->fetchColumn();
 
   $presentStmt = $pdo->prepare("
       SELECT COUNT(*)
       FROM attendance a
       JOIN users u ON u.user_id = a.user_id
-      JOIN employees e ON u.user_id = e.user_id
-      WHERE a.date = ?
+      JOIN employees e ON u.user_id = e.user_id AND e.company_id = u.company_id
+      WHERE a.company_id = ? AND u.company_id = a.company_id AND a.date = ?
         AND u.role != 'admin'
   ");
-  $presentStmt->execute([$date]);
+  $presentStmt->execute([$company_id, $date]);
   $present_count = (int) $presentStmt->fetchColumn();
 }
 
