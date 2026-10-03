@@ -131,15 +131,17 @@ function period_picker(string $param, string $value, string $type = 'month', arr
     }
 
     $unit = $isMonth ? 'month' : 'day';
-    $html = '<form method="get" class="period" action="' . e(basename($_SERVER['PHP_SELF'])) . '">' . $hidden;
-    $html .= '<a class="period-step" href="' . e($prevUrl) . '" aria-label="Previous ' . $unit . '">' . icon('chevron-left') . '</a>';
+    // data-query-own: param milik kontrol ini; param lain disinkronkan dari URL terkini di client (filter via Turbo Frame)
+    $own = e(implode(',', array_merge([$param], $resetParams)));
+    $html = '<form method="get" class="period" action="' . e(basename($_SERVER['PHP_SELF'])) . '" data-query-own="' . $own . '">' . $hidden;
+    $html .= '<a class="period-step" href="' . e($prevUrl) . '" data-query-own="' . $own . '" aria-label="Previous ' . $unit . '">' . icon('chevron-left') . '</a>';
     $html .= '<label class="period-label"><span>' . e($label) . '</span>'
         . '<input type="' . ($isMonth ? 'month' : 'date') . '" name="' . e($param) . '" value="' . e($value) . '"'
         . ' max="' . ($isMonth ? date('Y-m') : date('Y-m-d')) . '" aria-label="Choose ' . $unit . '" tabindex="-1"></label>';
     if ($nextDisabled) {
         $html .= '<span class="period-step" aria-disabled="true" aria-label="Next ' . $unit . '">' . icon('chevron-right') . '</span>';
     } else {
-        $html .= '<a class="period-step" href="' . e($nextUrl) . '" aria-label="Next ' . $unit . '">' . icon('chevron-right') . '</a>';
+        $html .= '<a class="period-step" href="' . e($nextUrl) . '" data-query-own="' . $own . '" aria-label="Next ' . $unit . '">' . icon('chevron-right') . '</a>';
     }
     return $html . '</form>';
 }

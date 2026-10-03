@@ -106,28 +106,33 @@ $min = (int) $target['min'];
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const colors = () => tokens.map(t => css('--vt-' + t));
 
-    function init() {
-      if (!window.Chart) return;
-      const chart = new Chart(document.getElementById('pie'), {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: colors(), borderWidth: 2, borderColor: css('--vt-surface'), hoverOffset: 4 }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '70%',
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { afterLabel: (ctx) => details[ctx.dataIndex] || '' } }
+    vortaReady(function () {
+      const canvas = document.getElementById('pie');
+      if (!canvas) return;
+      Vorta.loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js').then(function () {
+        if (!canvas.isConnected) return; // user sudah pindah halaman
+        const chart = new Chart(canvas, {
+          type: 'doughnut',
+          data: { labels, datasets: [{ data, backgroundColor: colors(), borderWidth: 2, borderColor: css('--vt-surface'), hoverOffset: 4 }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { afterLabel: (ctx) => details[ctx.dataIndex] || '' } }
+            }
           }
-        }
-      });
-      document.addEventListener('vorta:uichange', function () {
-        chart.data.datasets[0].backgroundColor = colors();
-        chart.data.datasets[0].borderColor = css('--vt-surface');
-        chart.update('none');
-      });
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+        });
+        const onTheme = function () {
+          chart.data.datasets[0].backgroundColor = colors();
+          chart.data.datasets[0].borderColor = css('--vt-surface');
+          chart.update('none');
+        };
+        document.addEventListener('vorta:uichange', onTheme);
+        Vorta.onLeave(function () { document.removeEventListener('vorta:uichange', onTheme); chart.destroy(); });
+      }).catch(function () {});
+    });
   })();
 </script>
 <?php endif; ?>

@@ -59,7 +59,8 @@ if (isset($_POST['submitAbsenceReason'])) {
         $stmt->execute([$user_id, $absence_date, $absence_type, "Absence Reason: $absence_type", $explanation]);
     }
 
-    attendance_redirect('?success=absence_reason_submitted');
+    flash_set('ok', attendance_messages()['success']['absence_reason_submitted']);
+    attendance_redirect();
 }
 
 if (isset($_POST['submitLeave'])) {

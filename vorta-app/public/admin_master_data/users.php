@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'users
     }
   }
 
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -84,7 +84,7 @@ if (isset($_GET['delete_user'])) {
     flash_set('bad', "Couldn't delete this user. They may still have reports or attendance records.");
   }
 
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -153,6 +153,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
     <?= pagination($page, $perPage, $totalUsers) ?>
   <?php endif; ?>
 </section>
+</turbo-frame>
 
 <aside class="drawer" id="drawer-user" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title" hidden>
   <form method="POST" id="user-form" action="<?= e($redirect) ?>">
@@ -193,6 +194,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 </aside>
 
 <script>
+(function () {
   function resetUserForm() {
     document.getElementById('user-form').reset();
     document.getElementById('form-title').textContent = 'Add user';
@@ -220,4 +222,8 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 
   document.getElementById('drawer-user').addEventListener('drawer:mode', resetUserForm);
   document.getElementById('drawer-user').addEventListener('drawer:close', resetUserForm);
+
+  // dipanggil dari atribut onclick
+  window.editUser = editUser;
+})();
 </script>

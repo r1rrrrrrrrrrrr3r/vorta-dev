@@ -39,7 +39,7 @@
   // ---------- Confirm dialog ----------
   let confirmEl = null;
   function confirmDialog({ title, message = '', confirmText = 'Confirm', cancelText = 'Cancel', tone = 'primary' } = {}) {
-    if (!confirmEl) {
+    if (!confirmEl || !confirmEl.isConnected) {
       confirmEl = document.createElement('dialog');
       confirmEl.className = 'dialog';
       confirmEl.setAttribute('aria-labelledby', 'confirm-title');
@@ -316,9 +316,20 @@
     if (label && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); label.click(); }
   });
   document.addEventListener('change', (e) => {
-    if (e.target.matches('.period-label input') && e.target.value) e.target.form.submit();
+    if (e.target.matches('.period-label input') && e.target.value) e.target.form.requestSubmit();
   });
-  $$('.period-label').forEach(l => { l.tabIndex = 0; l.setAttribute('role', 'button'); });
+
+  // ---------- Autosubmit select ----------
+  document.addEventListener('change', (e) => {
+    const f = e.target.form;
+    if (f && f.matches('form[data-autosubmit]') && e.target.matches('select')) f.requestSubmit();
+  });
+
+  // ---------- Navigation helper ----------
+  function visit(url, opts) {
+    if (window.Turbo) window.Turbo.visit(url, opts);
+    else window.location = url;
+  }
 
   // ---------- Confirm links/forms ----------
   document.addEventListener('click', (e) => {
@@ -332,8 +343,8 @@
       tone: a.dataset.confirmTone,
     }).then(ok => {
       if (!ok) return;
-      if (a.tagName === 'A') window.location = a.href;
-      else if (a.form) a.form.submit();
+      if (a.tagName === 'A') visit(a.href);
+      else if (a.form) a.form.requestSubmit(a);
     });
   });
   document.addEventListener('submit', (e) => {
@@ -348,14 +359,9 @@
     }).then(ok => {
       if (!ok) return;
       f._confirmed = true;
-      // pertahankan nilai tombol submit (mis. name="check_out")
-      const sub = e.submitter;
-      if (sub && sub.name) {
-        const h = document.createElement('input');
-        h.type = 'hidden'; h.name = sub.name; h.value = sub.value;
-        f.appendChild(h);
-      }
-      f.submit();
+      // requestSubmit(submitter) mempertahankan nilai tombol submit (mis. name="check_out")
+      const sub = e.submitter && e.submitter.form === f ? e.submitter : undefined;
+      try { f.requestSubmit(sub); } finally { f._confirmed = false; }
     });
   });
 
@@ -375,50 +381,213 @@
     window.VortaUI.setTheme(b.dataset.themeSet);
   });
   document.addEventListener('vorta:uichange', syncTheme);
-  syncTheme();
+
+  // ---------- Show/hide password ----------
+  // <button data-toggle-password="input-id">: ikon [data-eye]/[data-eye-off], atau teks Show/Hide.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-toggle-password]');
+    if (!btn) return;
+    const input = document.getElementById(btn.dataset.togglePassword);
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(show));
+    const eye = $('[data-eye]', btn);
+    const eyeOff = $('[data-eye-off]', btn);
+    if (eye && eyeOff) {
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      eye.hidden = show;
+      eyeOff.hidden = !show;
+    } else {
+      btn.textContent = show ? 'Hide' : 'Show';
+    }
+  });
 
   // ---------- Live search ----------
-  // Search inputs inside GET forms submit themselves while typing (debounced);
-  // focus and caret are restored after the page reloads.
-  const LIVE_KEY = 'vorta:live-search';
-  $$('form[method="get" i] input[type="search"]').forEach(input => {
-    let timer = null;
-    let composing = false;
-    const initial = input.value;
-    const submit = () => {
-      if (input.value.trim() === initial.trim()) return;
-      try {
-        sessionStorage.setItem(LIVE_KEY, JSON.stringify({ id: input.id, pos: input.selectionStart }));
-      } catch (e) { /* storage unavailable */ }
-      input.form.submit();
-    };
-    input.addEventListener('compositionstart', () => { composing = true; });
-    input.addEventListener('compositionend', () => { composing = false; input.dispatchEvent(new Event('input')); });
-    input.addEventListener('input', () => {
-      if (composing) return;
-      clearTimeout(timer);
-      timer = setTimeout(submit, 400);
+  // Input search di form GET men-submit form-nya sendiri (debounced). Form diarahkan ke
+  // <turbo-frame>, jadi input tidak ikut diganti dan fokus tetap.
+  const liveTimers = new WeakMap();
+  let composing = false;
+  document.addEventListener('compositionstart', () => { composing = true; });
+  document.addEventListener('compositionend', (e) => { composing = false; queueLive(e.target); });
+  document.addEventListener('input', (e) => { if (!composing) queueLive(e.target); });
+
+  function queueLive(input) {
+    if (!input.matches || !input.matches('form[method="get" i] input[type="search"]')) return;
+    const form = input.form;
+    clearTimeout(liveTimers.get(form));
+    liveTimers.set(form, setTimeout(() => {
+      const value = input.value.trim();
+      if (form.dataset.lastQuery === undefined) form.dataset.lastQuery = input.defaultValue.trim();
+      if (value === form.dataset.lastQuery) return;
+      form.dataset.lastQuery = value;
+      form.requestSubmit();
+    }, 400));
+  }
+  document.addEventListener('submit', (e) => {
+    const t = liveTimers.get(e.target);
+    if (t) clearTimeout(t);
+  }, true);
+
+  // ---------- Clear filters ----------
+  // <a href="(url tanpa filter)" data-filter-clear="form-id">: visibilitas diatur client.
+  function formHasFilters(form) {
+    return Array.from(form.elements).some(el =>
+      el.name && el.type !== 'hidden' && el.type !== 'submit' && el.value !== '');
+  }
+  function syncClearButton(btn) {
+    const form = document.getElementById(btn.dataset.filterClear);
+    if (form) btn.hidden = !formHasFilters(form);
+  }
+  function syncClearFor(form) {
+    if (!form || !form.id) return;
+    $$('[data-filter-clear="' + form.id + '"]').forEach(syncClearButton);
+  }
+  document.addEventListener('input', (e) => syncClearFor(e.target.form));
+  document.addEventListener('change', (e) => syncClearFor(e.target.form));
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter-clear]');
+    if (!btn) return;
+    const form = document.getElementById(btn.dataset.filterClear);
+    if (!form) return;
+    e.preventDefault();
+    Array.from(form.elements).forEach(el => {
+      if (!el.name || el.type === 'hidden' || el.type === 'submit') return;
+      if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
     });
-    input.form.addEventListener('submit', () => clearTimeout(timer));
+    form.dataset.lastQuery = '';
+    syncClearFor(form);
+    form.requestSubmit();
+    const first = form.querySelector('input[type="search"]');
+    if (first) first.focus();
   });
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(LIVE_KEY) || 'null');
-    sessionStorage.removeItem(LIVE_KEY);
-    const el = saved && document.getElementById(saved.id);
-    if (el) {
-      el.focus();
-      const pos = Math.min(saved.pos ?? el.value.length, el.value.length);
-      el.setSelectionRange(pos, pos);
-    }
-  } catch (e) { /* storage unavailable */ }
+
+  // ---------- Sinkron query string ----------
+  // Link/form di luar <turbo-frame> dirender dengan query string saat load halaman. Setelah filter
+  // berubah lewat frame, URL berubah tapi link itu tidak. data-query-own="a,b" = param milik kontrol
+  // ini; param lain diambil dari URL terkini tepat sebelum navigasi.
+  function ownKeys(el) { return (el.dataset.queryOwn || '').split(',').filter(Boolean); }
+  function currentParams(own) {
+    const p = new URLSearchParams(window.location.search);
+    own.forEach(k => p.delete(k));
+    return p;
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[data-query-own]');
+    if (!a) return;
+    const own = ownKeys(a);
+    const url = new URL(a.href, window.location.href);
+    const p = currentParams(own);
+    own.forEach(k => { if (url.searchParams.has(k)) p.set(k, url.searchParams.get(k)); });
+    const qs = p.toString();
+    a.href = url.pathname + (qs ? '?' + qs : '') + url.hash;
+  });
+  document.addEventListener('submit', (e) => {
+    const f = e.target;
+    if (!f.matches || !f.matches('form[data-query-own]')) return;
+    const own = ownKeys(f);
+    $$('input[type="hidden"]', f).forEach(h => { if (!own.includes(h.name)) h.remove(); });
+    currentParams(own).forEach((v, k) => {
+      const h = document.createElement('input');
+      h.type = 'hidden'; h.name = k; h.value = v; h.dataset.querySync = '';
+      f.prepend(h);
+    });
+  }, true);
 
   // ---------- Flash ----------
   function showFlash() {
-    (window.VORTA_FLASH || []).forEach(f => toast(f.message, { tone: f.tone }));
+    let items = window.VORTA_FLASH || [];
+    $$('script[data-vorta-flash]').forEach(el => {
+      try { items = items.concat(JSON.parse(el.textContent || '[]')); } catch (e) { /* abaikan */ }
+      el.textContent = '[]'; // sudah ditampilkan; jangan muncul lagi (frame-load, snapshot)
+    });
+    items.forEach(f => toast(f.message, { tone: f.tone }));
     window.VORTA_FLASH = [];
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showFlash);
-  else showFlash();
 
-  window.Vorta = { toast, confirm: confirmDialog, drawer, escapeHtml };
+  // ---------- Script loader ----------
+  const scriptCache = {};
+  function loadScript(src) {
+    if (!scriptCache[src]) {
+      scriptCache[src] = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => { delete scriptCache[src]; reject(new Error('load failed: ' + src)); };
+        document.head.appendChild(s);
+      });
+    }
+    return scriptCache[src];
+  }
+
+  // ---------- Page lifecycle (Turbo) ----------
+  const leaveFns = [];
+  function onLeave(fn) { leaveFns.push(fn); }
+  function runLeave() {
+    while (leaveFns.length) {
+      try { leaveFns.pop()(); } catch (e) { /* abaikan */ }
+    }
+  }
+
+  // Tutup semua UI sementara tanpa animasi (dipakai sebelum snapshot & morph).
+  function resetUiState() {
+    closeMenus();
+    $$('dialog[open]').forEach(d => d.close());
+    $$('.drawer').forEach(el => { el.classList.remove('is-open'); el.hidden = true; });
+    $$('[data-drawer-scrim]').forEach(s => { s.hidden = true; });
+    activeDrawer = null;
+    drawerOpener = null;
+    document.body.style.overflow = '';
+    const sb = $('#sidebar');
+    if (sb) sb.classList.remove('is-open');
+    const scrim = $('.sidebar-scrim');
+    if (scrim) scrim.hidden = true;
+    $$('.toast').forEach(t => t.remove());
+  }
+
+  function initPage(root) {
+    $$('.period-label', root).forEach(l => {
+      if (l.dataset.init) return;
+      l.dataset.init = '1';
+      l.tabIndex = 0;
+      l.setAttribute('role', 'button');
+    });
+    $$('[data-filter-clear]', root).forEach(syncClearButton);
+    syncTheme();
+    showFlash();
+  }
+
+  document.addEventListener('turbo:before-cache', () => {
+    resetUiState();
+    $$('script[data-vorta-flash]').forEach(s => s.remove());
+    window.VORTA_FLASH = [];
+  });
+  document.addEventListener('turbo:before-render', (e) => {
+    // Morph (refresh ke URL yang sama setelah POST) mempertahankan elemen & tidak menjalankan
+    // ulang script inline halaman, jadi pembersih halaman tidak dipanggil; cukup tutup UI sementara.
+    if (e.detail && e.detail.renderMethod === 'morph') resetUiState();
+    else runLeave();
+  });
+  document.addEventListener('turbo:before-frame-render', () => closeMenus());
+  document.addEventListener('turbo:load', () => initPage(document));
+  document.addEventListener('turbo:frame-load', (e) => initPage(e.target));
+
+  document.addEventListener('turbo:fetch-request-error', () => {
+    toast("Couldn't reach the server. Check your connection and try again.", { tone: 'bad' });
+  });
+  // Respons frame tanpa frame yang cocok (mis. sesi habis → redirect ke login): lakukan visit penuh.
+  document.addEventListener('turbo:frame-missing', (e) => {
+    e.preventDefault();
+    e.detail.visit(e.detail.response);
+  });
+
+  window.Vorta = { toast, confirm: confirmDialog, drawer, escapeHtml, onLeave, loadScript, visit };
+  // Script inline halaman yang jalan sebelum ui.js (load pertama) menunggu lewat window.vortaReady.
+  (window.__vortaQ || []).splice(0).forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
+
+  // Fallback kalau Turbo gagal dimuat: turbo:load tidak pernah terjadi.
+  if (!window.Turbo) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initPage(document));
+    else initPage(document);
+  }
 })();

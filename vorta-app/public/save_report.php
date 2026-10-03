@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/ui.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
@@ -18,6 +19,7 @@ $proof_link = trim($_POST['proof_link']) ?: null;
 $workforce_id = (int)$_POST['workforce_id'];
 
 if (empty($title) || empty($report_date) || $job_type_id <= 0) {
+    http_response_code(422);
     die("Incomplete data.");
 }
 
@@ -26,6 +28,7 @@ $stmt_lookup->execute([$job_type_id]);
 $job_type_row = $stmt_lookup->fetch();
 
 if (!$job_type_row) {
+    http_response_code(422);
     die("Invalid job type.");
 }
 $job_type = $job_type_row['name'];
@@ -35,6 +38,7 @@ $employeeStmt->execute([$user_id]);
 $employee = $employeeStmt->fetch();
 
 if (!$employee) {
+    http_response_code(422);
     die("Employee data not found.");
 }
 
@@ -43,6 +47,7 @@ $employee_id = $employee['employee_id'];
 $check = $pdo->prepare("SELECT 1 FROM work_force WHERE workforce_id = ?");
 $check->execute([$workforce_id]);
 if (!$check->fetch()) {
+    http_response_code(422);
     die("Invalid workforce.");
 }
 
@@ -51,11 +56,13 @@ $max_size = 1048576;
 
 if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_ERR_NO_FILE) {
     if ($_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
+        http_response_code(422);
         die("Upload failed, PHP error code: " . $_FILES['proof_image']['error']);
     }
     $file = $_FILES['proof_image'];
 
     if ($file['size'] > $max_size) {
+        http_response_code(422);
         die("Image file size must not exceed 1 MB.");
     }
 
@@ -63,6 +70,7 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
     $image_info = @getimagesize($file['tmp_name']);
     $mime = $image_info ? $image_info['mime'] : false;
     if (!in_array($mime, $allowed_types)) {
+        http_response_code(422);
         die("Unsupported image format. Use JPG, PNG, or WebP.");
     }
 
@@ -99,6 +107,7 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] !== UPLOAD_
     if (isset($image)) imagedestroy($image);
 
     if (!$success) {
+        http_response_code(422);
         die("Failed to process image.");
     }
 
@@ -123,8 +132,10 @@ try {
         $workforce_id 
     ]);
 
-    header("Location: my_reports.php?success=report_saved");
+    flash_set('ok', 'Report saved');
+    header("Location: my_reports.php", true, 303);
     exit;
 } catch (PDOException $e) {
+    http_response_code(422);
     die("Failed to save report: " . $e->getMessage());
 }

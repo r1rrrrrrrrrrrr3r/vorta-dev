@@ -34,11 +34,8 @@ $hasTabbar   = $hasTabbar ?? false;
   <div class="drawer-body" data-drawer-body></div>
   <div class="drawer-footer" data-drawer-footer></div>
 </aside>
-<script>window.VORTA_FLASH = <?= json_encode(flash_take(), JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
-<script src="js/ui.js"></script>
-<?php if (in_array('attendance', $pageScripts, true)): ?>
-<script src="js/attendance.js"></script>
-<?php endif; ?>
+<?php /* Data (bukan script yang dieksekusi) supaya tetap terbaca setelah morph refresh Turbo; dibaca ui.js. */ ?>
+<script type="application/json" data-vorta-flash><?= json_encode(flash_take(), JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <?php if (!empty($pageScriptHtml)) echo $pageScriptHtml; ?>
 </body>
 </html>

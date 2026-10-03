@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'job_t
       }
     }
   }
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -63,7 +63,7 @@ if (isset($_GET['delete_job_type'])) {
   } catch (PDOException $e) {
     flash_set('bad', "Couldn't delete this job type. Try again.");
   }
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -128,6 +128,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
     <?= pagination($page, $perPage, $totalJobTypes) ?>
   <?php endif; ?>
 </section>
+</turbo-frame>
 
 <aside class="drawer" id="drawer-job-type" role="dialog" aria-modal="true" aria-labelledby="jt-drawer-title" hidden>
   <form method="POST" id="jobtype-form" action="<?= e($redirect) ?>">
@@ -152,6 +153,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 </aside>
 
 <script>
+(function () {
   function resetJobTypeForm() {
     document.getElementById('jobtype-form').reset();
     document.getElementById('form-title').textContent = 'Add job type';
@@ -173,4 +175,8 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 
   document.getElementById('drawer-job-type').addEventListener('drawer:mode', resetJobTypeForm);
   document.getElementById('drawer-job-type').addEventListener('drawer:close', resetJobTypeForm);
+
+  // dipanggil dari atribut onclick
+  window.editJobType = editJobType;
+})();
 </script>

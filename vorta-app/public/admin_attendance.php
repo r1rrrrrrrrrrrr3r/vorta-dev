@@ -226,7 +226,7 @@ $exportUrl = 'export_excel.php?' . http_build_query([
   'notes' => $notesFilter,
   'user_id' => $userFilter,
 ]);
-$exportBtn = $tab === 'missing' ? '' : '<a class="btn btn-secondary" href="' . e($exportUrl) . '">' . icon('arrow-down-tray') . 'Export</a>';
+$exportBtn = $tab === 'missing' ? '' : '<a class="btn btn-secondary" href="' . e($exportUrl) . '" data-turbo="false">' . icon('arrow-down-tray') . 'Export</a>';
 
 $tabUrl = fn(string $t) => 'admin_attendance.php?' . http_build_query(array_filter([
   'tab' => $t,
@@ -238,7 +238,7 @@ $pageTitle = 'Attendance';
 $activeNav = 'attendance';
 include __DIR__ . '/../views/layout/start.php';
 ?>
-<?= page_header('Attendance', 'Check-ins, leave and absences', $exportBtn) ?>
+<?= page_header('Attendance', 'Check-ins, leave and absences') ?>
 
 <nav class="tabs" aria-label="Attendance views">
   <?php foreach (['daily' => 'Daily', 'monthly' => 'Monthly', 'missing' => 'Not checked in'] as $key => $label): ?>
@@ -251,7 +251,7 @@ include __DIR__ . '/../views/layout/start.php';
 <?php if ($tab === 'daily'): ?>
   <div class="toolbar">
     <?= period_picker('date', $date, 'date', ['daily_page']) ?>
-    <form method="get" class="contents" data-autosubmit>
+    <form method="get" id="aa-daily-filters" class="contents" data-autosubmit data-turbo-frame="aa-records" data-turbo-action="replace">
       <input type="hidden" name="tab" value="daily">
       <input type="hidden" name="date" value="<?= e($date) ?>">
       <label for="aa-shift" class="sr-only">Shift</label>
@@ -266,8 +266,11 @@ include __DIR__ . '/../views/layout/start.php';
         <input type="search" id="aa-search" name="q" class="input" placeholder="Search staff…" value="<?= e($q) ?>">
       </div>
     </form>
-    <span class="toolbar-count"><?= $totalDaily ?> record<?= $totalDaily === 1 ? '' : 's' ?></span>
   </div>
+
+  <?php /* Export ikut di dalam frame supaya URL-nya mengikuti filter terbaru. */ ?>
+  <turbo-frame id="aa-records" class="results-frame" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
+  <div class="toolbar"><span class="toolbar-count"><?= $totalDaily ?> record<?= $totalDaily === 1 ? '' : 's' ?></span><?= $exportBtn ?></div>
 
   <?= kpi_strip([
       ['label' => 'Present', 'value' => $dayCounts['Present'] ?? 0, 'note' => fmt_date($date, 'day')],
@@ -309,11 +312,12 @@ include __DIR__ . '/../views/layout/start.php';
       <?= pagination($dailyPage, $limitDaily, $totalDaily, 'daily_page') ?>
     <?php endif; ?>
   </section>
+  </turbo-frame>
 
 <?php elseif ($tab === 'monthly'): ?>
   <div class="toolbar">
     <?= period_picker('month', $month, 'month', ['monthly_page']) ?>
-    <form method="get" class="contents" data-autosubmit>
+    <form method="get" id="aa-monthly-filters" class="contents" data-autosubmit data-turbo-frame="aa-monthly" data-turbo-action="replace">
       <input type="hidden" name="tab" value="monthly">
       <input type="hidden" name="month" value="<?= e($month) ?>">
       <label for="aa-staff" class="sr-only">Staff</label>
@@ -324,8 +328,10 @@ include __DIR__ . '/../views/layout/start.php';
         <?php endforeach; ?>
       </select>
     </form>
-    <span class="toolbar-count"><?= $totalMonthly ?> staff</span>
   </div>
+
+  <turbo-frame id="aa-monthly" class="results-frame" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
+  <div class="toolbar"><span class="toolbar-count"><?= $totalMonthly ?> staff</span><?= $exportBtn ?></div>
 
   <?php if (empty($userFilter)): ?>
     <?= kpi_strip([
@@ -379,6 +385,7 @@ include __DIR__ . '/../views/layout/start.php';
       <?= pagination($monthlyPage, $limitMonthly, $totalMonthly, 'monthly_page') ?>
     <?php endif; ?>
   </section>
+  </turbo-frame>
 
 <?php else: ?>
   <div class="toolbar">
@@ -391,6 +398,7 @@ include __DIR__ . '/../views/layout/start.php';
       ['label' => 'Not checked in', 'value' => $missingCount, 'tone' => $missingCount > 0 ? 'bad' : null],
   ]) ?>
 
+  <turbo-frame id="aa-missing" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
   <section class="card">
     <?php if (empty($users_not_checked_in)): ?>
       <?= empty_state('Everyone has checked in', 'All staff have an attendance record for ' . fmt_date($date, 'long') . '.') ?>
@@ -411,9 +419,7 @@ include __DIR__ . '/../views/layout/start.php';
       <?= pagination($missingPage, $limit, $missingCount, 'missing_page') ?>
     <?php endif; ?>
   </section>
+  </turbo-frame>
 <?php endif; ?>
 
-<script>
-  document.querySelectorAll('form[data-autosubmit] select').forEach(s => s.addEventListener('change', () => s.form.submit()));
-</script>
 <?php include __DIR__ . '/../views/layout/end.php'; ?>

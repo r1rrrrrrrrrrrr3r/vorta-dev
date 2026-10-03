@@ -59,7 +59,7 @@ if ($isAdmin) {
 
     $pageTitle = 'Dashboard';
     $activeNav = 'dashboard';
-    $pageScripts = ['chart'];
+    $pageScripts = [];
     include __DIR__ . '/../views/layout/start.php';
     include __DIR__ . '/../views/dashboard/admin.php';
     include __DIR__ . '/../views/layout/end.php';

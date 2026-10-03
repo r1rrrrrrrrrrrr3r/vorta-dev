@@ -21,15 +21,12 @@ function attendance_messages(): array
     ];
 }
 
-/** Alert HTML for ?error= / ?success= on attendance-related pages. */
+/** Alert HTML for ?error= on attendance-related pages (success messages go through flash_set). */
 function attendance_alert_html(): string
 {
     $m = attendance_messages();
     if (isset($_GET['error'])) {
         return alert_box('bad', $m['error'][(string) $_GET['error']] ?? 'Something went wrong. Try again.');
-    }
-    if (isset($_GET['success'])) {
-        return alert_box('ok', $m['success'][(string) $_GET['success']] ?? 'Done.');
     }
     return '';
 }
@@ -42,7 +39,7 @@ function attendance_redirect(string $query = ''): never
     if (!in_array($target, $allowed, true)) {
         $target = 'attendance.php';
     }
-    header('Location: ' . $target . $query);
+    header('Location: ' . $target . $query, true, 303);
     exit;
 }
 

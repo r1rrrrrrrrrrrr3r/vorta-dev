@@ -256,6 +256,13 @@
   .tab-count { background: var(--vt-bad-soft); color: var(--vt-bad); font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; line-height: 18px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .toolbar-count { margin-left: auto; font-size: 13px; color: var(--vt-muted); }
+  /* Turbo: wrapper halaman & frame hasil (search/filter/pagination) */
+  .page-section { display: contents; }
+  turbo-frame { display: block; }
+  .results-frame { display: flex; flex-direction: column; gap: 12px; }
+  turbo-frame[busy] { opacity: .6; transition: opacity .15s; }
+  @media (prefers-reduced-motion: reduce) { turbo-frame[busy] { transition: none; } }
+  .turbo-progress-bar { height: 2px; background-color: var(--vt-accent); }
   .toolbar .input, .toolbar .input-icon { width: 240px; max-width: 100%; }
   .toolbar .input-icon .input { width: 100%; }
   .toolbar .select { width: auto; min-width: 140px; }

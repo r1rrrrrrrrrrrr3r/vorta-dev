@@ -59,7 +59,7 @@ $renderUserMenu = function (string $id) use ($userName, $userEmail, $themePref):
             . icon($ic) . $label . icon('check', 'menu-check size-4') . '</button>';
     }
     return $html . '<div class="menu-sep"></div>'
-        . '<a class="menu-item" role="menuitem" href="logout.php">' . icon('arrow-right-on-rectangle') . 'Log out</a></div>';
+        . '<a class="menu-item" role="menuitem" href="logout.php" data-turbo="false">' . icon('arrow-right-on-rectangle') . 'Log out</a></div>';
 };
 ?>
 <!DOCTYPE html>
@@ -68,15 +68,20 @@ $renderUserMenu = function (string $id) use ($userName, $userEmail, $themePref):
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($pageTitle) ?> · Vorta</title>
-  <link rel="icon" href="../images/vorta.png">
+  <link rel="icon" href="images/vorta.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="css/output.css">
+  <?php $asset = fn(string $p): string => $p . '?v=' . @filemtime(__DIR__ . '/../../public/' . $p); ?>
+  <meta name="turbo-prefetch" content="false">
+  <meta name="turbo-refresh-method" content="morph">
+  <meta name="turbo-refresh-scroll" content="preserve">
+  <link rel="stylesheet" href="<?= e($asset('css/output.css')) ?>" data-turbo-track="reload">
   <?php include __DIR__ . '/../../public/ui_head.php'; ?>
-  <?php if (in_array('chart', $pageScripts, true)): ?>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <?php endif; ?>
+  <script>window.vortaReady = window.vortaReady || function (fn) { if (window.Vorta) fn(); else (window.__vortaQ = window.__vortaQ || []).push(fn); };</script>
+  <script src="<?= e($asset('js/vendor/turbo.js')) ?>" defer data-turbo-track="reload"></script>
+  <script src="<?= e($asset('js/ui.js')) ?>" defer data-turbo-track="reload"></script>
+  <script src="<?= e($asset('js/attendance.js')) ?>" defer data-turbo-track="reload"></script>
 </head>
 <body class="app<?= $hasTabbar ? ' has-tabbar' : '' ?>">
 <a href="#main" class="skip-link">Skip to content</a>
@@ -85,7 +90,7 @@ $renderUserMenu = function (string $id) use ($userName, $userEmail, $themePref):
 <?php else: ?>
 <aside class="sidebar" id="sidebar" aria-label="Main navigation">
   <a href="dashboard.php" class="sidebar-brand">
-    <img src="../images/vorta.png" alt="">
+    <img src="images/vorta.png" alt="">
     <span><span class="sidebar-brand-title">Vorta</span><span class="sidebar-brand-sub">Productivity Tracker</span></span>
   </a>
   <nav>
@@ -113,7 +118,7 @@ $renderUserMenu = function (string $id) use ($userName, $userEmail, $themePref):
 <div class="app-main">
   <header class="topbar lg:hidden">
     <button type="button" class="btn btn-ghost btn-icon" data-sidebar-open aria-label="Open menu" aria-controls="sidebar"><?= icon('bars-3', 'size-5') ?></button>
-    <img src="../images/vorta.png" alt="">
+    <img src="images/vorta.png" alt="">
     <span class="topbar-title"><?= e($pageTitle) ?></span>
     <span class="flex-1"></span>
     <div class="relative">

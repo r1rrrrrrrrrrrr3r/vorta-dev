@@ -1,12 +1,14 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/ui.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
 $report_id = $_POST['report_id'] ?? null;
 
 if (!$report_id) {
+    http_response_code(422);
     die("Invalid report ID.");
 }
 
@@ -16,6 +18,7 @@ $report = $stmt->fetch();
 
 if (!$report || $report['status'] !== 'Progress') {
     http_response_code(403);
+    http_response_code(422);
     die("Access denied or report has already been completed.");
 }
 
@@ -41,6 +44,7 @@ if (isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] == 0) {
             $proof_image = $filename;
         }
     } else {
+        http_response_code(422);
         die("Unsupported image format.");
     }
 }
@@ -63,8 +67,10 @@ $result = $stmt->execute([
 ]);
 
 if ($result) {
-    header("Location: my_reports.php?month=" . urlencode(date('Y-m', strtotime($report_date))) . "&edit=success");
+    flash_set('ok', 'Report updated');
+    header("Location: my_reports.php?month=" . urlencode(date('Y-m', strtotime($report_date))), true, 303);
 } else {
-    header("Location: my_reports.php?edit=error");
+    flash_set('bad', "Couldn't save the report. Try again.");
+    header("Location: my_reports.php", true, 303);
 }
 exit;

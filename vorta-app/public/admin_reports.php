@@ -138,7 +138,7 @@ include __DIR__ . '/../views/layout/start.php';
 <?php if ($tab === 'all'): ?>
   <div class="toolbar">
     <?= period_picker('month', $month, 'month', ['page']) ?>
-    <form method="get" class="contents" data-autosubmit>
+    <form method="get" id="ar-filters" class="contents" data-autosubmit data-turbo-frame="ar-results" data-turbo-action="replace">
       <input type="hidden" name="month" value="<?= e($month) ?>">
       <div class="input-icon">
         <?= icon('magnifying-glass') ?>
@@ -166,10 +166,11 @@ include __DIR__ . '/../views/layout/start.php';
         <option value="Completed"<?= $filterStatus === 'Completed' ? ' selected' : '' ?>>Completed</option>
       </select>
     </form>
-    <?php if ($hasFilters): ?><a class="link text-[13px]" href="<?= e(query_url(['q' => null, 'user_id' => null, 'job_type' => null, 'status' => null, 'page' => null])) ?>">Clear filters</a><?php endif; ?>
-    <span class="toolbar-count"><?= $totalReports ?> report<?= $totalReports === 1 ? '' : 's' ?></span>
+    <a class="link text-[13px]" href="<?= e(query_url(['q' => null, 'user_id' => null, 'job_type' => null, 'status' => null, 'page' => null])) ?>" data-filter-clear="ar-filters"<?= $hasFilters ? '' : ' hidden' ?>>Clear filters</a>
   </div>
 
+  <turbo-frame id="ar-results" class="results-frame" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
+  <div class="toolbar"><span class="toolbar-count"><?= $totalReports ?> report<?= $totalReports === 1 ? '' : 's' ?></span></div>
   <section class="card">
     <?php if (empty($rows)): ?>
       <?= $hasFilters
@@ -213,6 +214,7 @@ include __DIR__ . '/../views/layout/start.php';
       <?= pagination($page, $limit, $totalReports) ?>
     <?php endif; ?>
   </section>
+  </turbo-frame>
 
 <?php else: ?>
   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -232,6 +234,7 @@ include __DIR__ . '/../views/layout/start.php';
     <span class="text-[13px] text-muted"><?= $todayStats['complete'] ?> of <?= $todayStats['total'] ?> staff complete</span>
   </div>
 
+  <turbo-frame id="ar-today-results" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
   <section class="card">
     <?php if (!$shortRows): ?>
       <?= empty_state('No active staff') ?>
@@ -284,9 +287,7 @@ include __DIR__ . '/../views/layout/start.php';
       <?= pagination($shortPage, $shortLimit, $totalShort, 'short_page') ?>
     <?php endif; ?>
   </section>
+  </turbo-frame>
 <?php endif; ?>
 
-<script>
-  document.querySelectorAll('form[data-autosubmit] select').forEach(s => s.addEventListener('change', () => s.form.submit()));
-</script>
 <?php include __DIR__ . '/../views/layout/end.php'; ?>

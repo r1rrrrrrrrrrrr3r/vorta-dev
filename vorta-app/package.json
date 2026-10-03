@@ -5,6 +5,10 @@
   },
   "scripts": {
     "build": "tailwindcss -i ./src/css/input.css -o ./public/css/output.css --watch",
-    "css": "tailwindcss -i ./src/css/input.css -o ./public/css/output.css --minify"
+    "css": "tailwindcss -i ./src/css/input.css -o ./public/css/output.css --minify",
+    "vendor": "node -e \"require('fs').mkdirSync('public/js/vendor',{recursive:true});require('fs').copyFileSync('node_modules/@hotwired/turbo/dist/turbo.es2017-umd.js','public/js/vendor/turbo.js')\""
+  },
+  "devDependencies": {
+    "@hotwired/turbo": "^8.0.23"
   }
 }

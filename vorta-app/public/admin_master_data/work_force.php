@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'work_
       }
     }
   }
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -63,7 +63,7 @@ if (isset($_GET['delete_work_force'])) {
   } catch (PDOException $e) {
     flash_set('bad', "Couldn't delete this work force. It may still be used by reports.");
   }
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -128,6 +128,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
     <?= pagination($page, $perPage, $totalworkforce) ?>
   <?php endif; ?>
 </section>
+</turbo-frame>
 
 <aside class="drawer" id="drawer-work-force" role="dialog" aria-modal="true" aria-labelledby="wf-drawer-title" hidden>
   <form method="POST" id="workforce-form" action="<?= e($redirect) ?>">
@@ -152,6 +153,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 </aside>
 
 <script>
+(function () {
   function resetWorkforceForm() {
     document.getElementById('workforce-form').reset();
     document.getElementById('form-title').textContent = 'Add work force';
@@ -173,4 +175,8 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 
   document.getElementById('drawer-work-force').addEventListener('drawer:mode', resetWorkforceForm);
   document.getElementById('drawer-work-force').addEventListener('drawer:close', resetWorkforceForm);
+
+  // dipanggil dari atribut onclick
+  window.editWorkforce = editWorkforce;
+})();
 </script>

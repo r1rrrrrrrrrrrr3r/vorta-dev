@@ -52,7 +52,7 @@ include __DIR__ . '/../views/layout/start.php';
     <?php include __DIR__ . '/../views/reports/form_fields.php'; ?>
     <div class="card-footer justify-end">
       <a class="btn btn-ghost" href="my_reports.php">Cancel</a>
-      <button type="submit" class="btn btn-primary">Save changes</button>
+      <button type="submit" class="btn btn-primary" data-turbo-submits-with="Saving…">Save changes</button>
     </div>
   </form>
 

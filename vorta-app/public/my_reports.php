@@ -60,15 +60,6 @@ $monthCount = array_sum($dailyCounts);
 $min = (int) $monthlyTarget['min'];
 $max = max(1, (int) $monthlyTarget['max']);
 
-$toast = null;
-if (($_GET['success'] ?? '') === 'report_saved') {
-    $toast = ['Report saved', 'ok'];
-} elseif (($_GET['edit'] ?? '') === 'success') {
-    $toast = ['Report updated', 'ok'];
-} elseif (($_GET['edit'] ?? '') === 'error') {
-    $toast = ["Couldn't save the report. Try again.", 'bad'];
-}
-
 $hasFilters = $statusFilter !== '' || $q !== '';
 
 $pageTitle = 'My reports';
@@ -89,27 +80,29 @@ include __DIR__ . '/../views/layout/start.php';
   <?= daybars($month, $dailyCounts, $dailyMin) ?>
 </section>
 
+<div id="my-reports" class="page-section">
 <div class="toolbar">
   <?= period_picker('month', $month, 'month', ['page']) ?>
   <nav class="seg" aria-label="Filter by status">
     <?php foreach (['' => 'All', 'Progress' => 'In progress', 'Completed' => 'Completed'] as $val => $lbl): ?>
-      <a href="<?= e(query_url(['status' => $val ?: null, 'page' => null])) ?>" class="<?= $statusFilter === $val ? 'is-active' : '' ?>"<?= $statusFilter === $val ? ' aria-current="true"' : '' ?>><?= $lbl ?></a>
+      <a href="<?= e(query_url(['status' => $val ?: null, 'page' => null])) ?>" data-query-own="status,page" class="<?= $statusFilter === $val ? 'is-active' : '' ?>"<?= $statusFilter === $val ? ' aria-current="true"' : '' ?>><?= $lbl ?></a>
     <?php endforeach; ?>
   </nav>
-  <form method="get" class="input-icon" role="search">
+  <form method="get" id="mr-filters" class="input-icon" role="search" data-turbo-frame="mr-results" data-turbo-action="replace">
     <input type="hidden" name="month" value="<?= e($month) ?>">
     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= e($statusFilter) ?>"><?php endif; ?>
     <?= icon('magnifying-glass') ?>
     <label for="mr-search" class="sr-only">Search titles</label>
     <input type="search" id="mr-search" name="q" class="input" placeholder="Search titles…" value="<?= e($q) ?>">
   </form>
-  <span class="toolbar-count"><?= $total ?> report<?= $total === 1 ? '' : 's' ?></span>
 </div>
 
+<turbo-frame id="mr-results" class="results-frame" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
+<div class="toolbar"><span class="toolbar-count"><?= $total ?> report<?= $total === 1 ? '' : 's' ?></span></div>
 <section class="card">
   <?php if (empty($rows)): ?>
     <?php if ($hasFilters): ?>
-      <?= empty_state('No reports match these filters', 'Try another month or clear the filters.', '<a class="btn btn-secondary btn-sm" href="' . e(query_url(['status' => null, 'q' => null, 'page' => null])) . '">Clear filters</a>') ?>
+      <?= empty_state('No reports match these filters', 'Try another month or clear the filters.', '<a class="btn btn-secondary btn-sm" href="' . e(query_url(['status' => null, 'q' => null, 'page' => null])) . '" data-turbo-frame="_top">Clear filters</a>') ?>
     <?php else: ?>
       <?= empty_state('No reports in ' . fmt_month($month), 'Reports you submit this month will appear here.', '<a class="btn btn-primary" href="report_form.php">' . icon('plus') . 'New report</a>') ?>
     <?php endif; ?>
@@ -164,12 +157,13 @@ include __DIR__ . '/../views/layout/start.php';
     <?= pagination($page, $limit, $total) ?>
   <?php endif; ?>
 </section>
+</turbo-frame>
+</div>
 
 <a class="fab md:hidden" href="report_form.php" aria-label="New report"><?= icon('plus') ?></a>
 
 <script>
 (function () {
-  const toast = <?= json_encode($toast) ?>;
   function post(url, body) {
     return fetch(url, {
       method: 'POST',
@@ -179,17 +173,10 @@ include __DIR__ . '/../views/layout/start.php';
     }).then(r => r.json());
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    if (toast) {
-      Vorta.toast(toast[0], { tone: toast[1] });
-      const url = new URL(window.location.href);
-      url.searchParams.delete('success');
-      url.searchParams.delete('edit');
-      history.replaceState(null, '', url.pathname + url.search);
-    }
-  });
-
-  document.addEventListener('click', function (e) {
+  // Listener di root halaman (elemen baru tiap render, jadi tidak menumpuk); root mencakup frame hasil.
+  const root = document.getElementById('my-reports');
+  if (!root) return;
+  root.addEventListener('click', function (e) {
     const view = e.target.closest('[data-view-report]');
     if (view) {
       const row = document.getElementById('row-' + view.dataset.viewReport);

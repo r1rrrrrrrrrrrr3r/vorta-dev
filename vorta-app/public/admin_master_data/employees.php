@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'emplo
     }
   }
 
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -110,7 +110,7 @@ if (isset($_GET['delete_emp'])) {
     flash_set('bad', "Couldn't delete: " . $e->getMessage());
   }
 
-  header('Location: ' . $redirect);
+  header('Location: ' . $redirect, true, 303);
   exit;
 }
 
@@ -197,6 +197,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
     <?= pagination($page, $perPage, $totalEmployees) ?>
   <?php endif; ?>
 </section>
+</turbo-frame>
 
 <aside class="drawer" id="drawer-employee" role="dialog" aria-modal="true" aria-labelledby="emp-drawer-title" hidden>
   <form method="POST" id="employee-form" action="<?= e($redirect) ?>">
@@ -244,6 +245,7 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 </aside>
 
 <script>
+(function () {
   const empUserSelect = document.getElementById('user_id');
 
   function resetEmployeeForm() {
@@ -278,4 +280,8 @@ include __DIR__ . '/../../views/master_data/toolbar.php';
 
   document.getElementById('drawer-employee').addEventListener('drawer:mode', resetEmployeeForm);
   document.getElementById('drawer-employee').addEventListener('drawer:close', resetEmployeeForm);
+
+  // dipanggil dari atribut onclick
+  window.editEmployee = editEmployee;
+})();
 </script>

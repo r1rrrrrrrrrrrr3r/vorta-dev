@@ -19,10 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'theme' => $user['theme'] ?? 'system',
       'nav_layout' => $user['nav_layout'] ?? 'sidebar'
     ];
-    header("Location: dashboard.php");
+    header("Location: dashboard.php", true, 303);
     exit;
   } else {
     $error = "Email or password is incorrect.";
+    http_response_code(422);
   }
 }
 
@@ -32,7 +33,7 @@ include __DIR__ . '/../views/layout/start.php';
 ?>
 <div class="w-full max-w-sm grid gap-6">
   <div class="flex items-center justify-center gap-3">
-    <img src="../images/vorta.png" alt="" class="size-10 object-contain">
+    <img src="images/vorta.png" alt="" class="size-10 object-contain">
     <span class="text-[18px] font-extrabold">Vorta</span>
   </div>
 
@@ -53,7 +54,7 @@ include __DIR__ . '/../views/layout/start.php';
       <label class="label" for="password">Password</label>
       <div class="input-group">
         <input type="password" name="password" id="password" class="input" required autocomplete="current-password">
-        <button type="button" class="btn btn-ghost btn-sm" id="toggle-password" aria-controls="password" aria-pressed="false">Show</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-toggle-password="password" aria-controls="password" aria-pressed="false">Show</button>
       </div>
     </div>
 
@@ -62,13 +63,4 @@ include __DIR__ . '/../views/layout/start.php';
 
   <p class="text-center text-[12px] text-muted m-0">Vorta Productivity Tracker</p>
 </div>
-<script>
-  document.getElementById('toggle-password').addEventListener('click', function () {
-    const input = document.getElementById('password');
-    const show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    this.textContent = show ? 'Hide' : 'Show';
-    this.setAttribute('aria-pressed', String(show));
-  });
-</script>
 <?php include __DIR__ . '/../views/layout/end.php'; ?>

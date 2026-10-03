@@ -1,11 +1,7 @@
 (function () {
   'use strict';
-
-  const shiftSelect = document.getElementById('shiftSelect');
-  const explanationContainer = document.getElementById('explanationContainer');
-  const checkInForm = document.getElementById('checkInForm');
-  const shiftHint = document.getElementById('shiftHint');
-  const absenceReasonForm = document.getElementById('absenceReasonForm');
+  // Listener didelegasikan ke document (dipasang sekali) supaya tetap jalan setelah
+  // navigasi Turbo/morph tanpa menumpuk. Jam per halaman dibersihkan lewat Vorta.onLeave.
 
   function getCurrentTime() {
     const now = new Date();
@@ -22,59 +18,81 @@
     return false;
   }
 
-  absenceReasonForm?.addEventListener('submit', function (e) {
-    const now = new Date();
-    if (now.getHours() === 23 && now.getMinutes() >= 59) {
-      e.preventDefault();
-      window.Vorta?.toast("The deadline for today's absence report (23:59) has passed.", { tone: 'bad' });
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (form.id === 'absenceReasonForm') {
+      const now = new Date();
+      if (now.getHours() === 23 && now.getMinutes() >= 59) {
+        e.preventDefault();
+        window.Vorta?.toast("The deadline for today's absence report (23:59) has passed.", { tone: 'bad' });
+      }
+      return;
+    }
+    if (form.id === 'checkInForm') {
+      const shiftSelect = document.getElementById('shiftSelect');
+      const explanationContainer = document.getElementById('explanationContainer');
+      const textarea = form.querySelector('textarea[name="explanation"]');
+      const explanation = textarea?.value.trim();
+      const err = form.querySelector('[data-late-error]');
+      if (shiftSelect && isLate(shiftSelect.value, getCurrentTime()) && (!explanation || explanation.length < 10)) {
+        e.preventDefault();
+        if (explanationContainer) explanationContainer.hidden = false;
+        if (err) err.hidden = false;
+        textarea?.setAttribute('aria-invalid', 'true');
+        textarea?.focus();
+      }
     }
   });
 
-  shiftSelect?.addEventListener('change', function () {
-    const late = isLate(this.value, getCurrentTime());
-    explanationContainer.hidden = !late;
+  document.addEventListener('change', function (e) {
+    const select = e.target;
+    if (select.id !== 'shiftSelect') return;
+    const explanationContainer = document.getElementById('explanationContainer');
+    const checkInForm = document.getElementById('checkInForm');
+    const shiftHint = document.getElementById('shiftHint');
+    const late = isLate(select.value, getCurrentTime());
+    if (explanationContainer) explanationContainer.hidden = !late;
     if (shiftHint) {
-      shiftHint.textContent = !this.value
+      shiftHint.textContent = !select.value
         ? "Pick the shift you're working today."
         : (late ? "You're past the on-time limit for this shift, so a reason is needed." : "You're on time for this shift.");
     }
 
     const locationMap = { WFO: 'Office', WAC: 'Client', WFH: 'Home', WFA: 'Anywhere' };
     const locationInput = checkInForm?.querySelector('input[name="location"]');
-    if (locationInput && locationMap[this.value]) {
-      locationInput.value = locationMap[this.value];
-    }
-  });
-
-  checkInForm?.addEventListener('submit', function (e) {
-    const textarea = checkInForm.querySelector('textarea[name="explanation"]');
-    const explanation = textarea?.value.trim();
-    const err = checkInForm.querySelector('[data-late-error]');
-    if (isLate(shiftSelect.value, getCurrentTime()) && (!explanation || explanation.length < 10)) {
-      e.preventDefault();
-      explanationContainer.hidden = false;
-      if (err) err.hidden = false;
-      textarea?.setAttribute('aria-invalid', 'true');
-      textarea?.focus();
+    if (locationInput && locationMap[select.value]) {
+      locationInput.value = locationMap[select.value];
     }
   });
 
   // Waktu check-out di pesan konfirmasi mengikuti jam saat tombol ditekan
-  document.querySelectorAll('[data-checkout-form]').forEach(form => {
-    form.addEventListener('click', () => {
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      form.dataset.confirmMessage = `Your check-out time will be ${hhmm}.`;
-    }, true);
-  });
+  // (capture, supaya jalan sebelum dialog konfirmasi di ui.js membaca data-confirm-message)
+  document.addEventListener('click', function (e) {
+    const form = e.target.closest && e.target.closest('[data-checkout-form]');
+    if (!form) return;
+    const now = new Date();
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    form.dataset.confirmMessage = `Your check-out time will be ${hhmm}.`;
+  }, true);
 
-  // Jam di kartu hari ini
-  const clock = document.querySelector('[data-clock]');
-  if (clock) {
+  // Jam di kartu hari ini (satu interval saja, juga setelah morph refresh)
+  let clockTimer = null;
+  function init() {
+    clearInterval(clockTimer);
+    clockTimer = null;
+    if (!document.querySelector('[data-clock]')) return;
     const tick = () => {
+      const clock = document.querySelector('[data-clock]');
+      if (!clock) return;
       const now = new Date();
       clock.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     };
-    setInterval(tick, 15000);
+    clockTimer = setInterval(tick, 15000);
+    if (window.Vorta && window.Vorta.onLeave) window.Vorta.onLeave(() => { clearInterval(clockTimer); clockTimer = null; });
+  }
+
+  document.addEventListener('turbo:load', init);
+  if (!window.Turbo) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   }
 })();

@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'setti
     ]);
 
     flash_set($result['ok'] ? 'ok' : 'bad', $result['message']);
-    header('Location: settings.php');
+    header('Location: settings.php', true, 303);
     exit;
 }
 

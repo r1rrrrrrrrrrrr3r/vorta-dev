@@ -143,12 +143,6 @@ $acceptLabel = in_array('image/webp', $acceptTypes, true) ? 'JPG, PNG or WebP, u
     handle(file);
   });
 
-  const form = input.form;
-  form.addEventListener('submit', (e) => {
-    if (form.dataset.submitting) { e.preventDefault(); return; }
-    form.dataset.submitting = '1';
-    const btn = form.querySelector('[type=submit]');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  });
+  // Status "Saving…" & disable tombol selama submit ditangani Turbo (data-turbo-submits-with).
 })();
 </script>

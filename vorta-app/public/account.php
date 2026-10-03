@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['account_error'] = ['profile', $result['message']];
         }
-        header('Location: account.php?section=profile');
+        header('Location: account.php?section=profile', true, 303);
         exit;
     }
     if ($form === 'password') {
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['account_error'] = ['password', $result['message']];
         }
-        header('Location: account.php?section=password');
+        header('Location: account.php?section=password', true, 303);
         exit;
     }
 }
@@ -197,19 +197,10 @@ include __DIR__ . '/../views/layout/start.php';
         </div>
       </form>
       <script>
-        document.querySelectorAll('[data-toggle-password]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const input = document.getElementById(btn.dataset.togglePassword);
-            const show = input.type === 'password';
-            input.type = show ? 'text' : 'password';
-            btn.setAttribute('aria-pressed', String(show));
-            btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-            btn.querySelector('[data-eye]').hidden = show;
-            btn.querySelector('[data-eye-off]').hidden = !show;
-          });
-        });
         (function () {
+          // toggle show/hide password ditangani delegasi [data-toggle-password] di ui.js
           const form = document.getElementById('password-form');
+          if (!form) return;
           const np = document.getElementById('new_password');
           const cp = document.getElementById('confirm_password');
           const err = document.getElementById('pw-mismatch');

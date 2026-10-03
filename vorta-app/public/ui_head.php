@@ -4,6 +4,12 @@ $uiTheme = $_SESSION['user']['theme'] ?? '';
 <script>
   (function () {
     var serverTheme = <?= json_encode($uiTheme ?: null) ?>;
+    // Turbo menjalankan ulang script ini kalau isinya berubah (mis. setelah login / tema berubah):
+    // cukup terapkan tema server, jangan pasang listener dua kali.
+    if (window.VortaUI) {
+      if (serverTheme) window.VortaUI.setTheme(serverTheme, false);
+      return;
+    }
     var THEMES = ['light', 'dark', 'system'];
 
     function read(key) {
