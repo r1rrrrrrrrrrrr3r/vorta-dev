@@ -3,6 +3,8 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/config.php';
 require_once __DIR__ . '/../lib/mailer.php';
+require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/ui.php';
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -33,41 +35,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $message = 'If an active account exists for that email, reset instructions may be sent. If you do not receive them, check the address or contact your administrator.';
 }
+
+$layout = 'bare';
+$pageTitle = 'Reset password';
+include __DIR__ . '/../views/layout/start.php';
 ?>
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reset password - Vorta Prodtracker</title>
-  <link rel="stylesheet" href="css/output.css"><?php include __DIR__ . '/ui_head.php'; ?>
-</head>
-<body class="account-shell">
-  <main class="account-card">
-    <div class="account-brand">
-      <img src="../images/vorta.png" alt="Vorta">
-      <div>
-        <div class="account-brand-name">Vorta Prodtracker</div>
-        <div class="account-brand-sub">Productivity System</div>
-      </div>
+<div class="w-full max-w-sm grid gap-6">
+  <div class="flex items-center justify-center gap-3">
+    <img src="images/vorta.png" alt="" class="size-10 object-contain">
+    <span class="text-[18px] font-extrabold">Vorta</span>
+  </div>
+
+  <form method="post" class="card card-body grid gap-4" data-turbo="false">
+    <?= csrf_field() ?>
+    <div>
+      <h1 class="text-[20px] font-bold m-0">Reset your password</h1>
+      <p class="m-0 mt-1 text-muted text-[13px]">Enter your account email and we&rsquo;ll send a secure reset link if the account exists.</p>
     </div>
 
-    <h1 class="account-title">Reset your password</h1>
-    <p class="account-copy">Enter your account email and we&rsquo;ll send a secure reset link if the account exists.</p>
-
     <?php if ($message): ?>
-      <div class="account-alert account-alert--ok"><?= htmlspecialchars($message) ?></div>
+      <?= alert_box('ok', $message) ?>
     <?php endif; ?>
 
-    <form method="post">
-      <?= csrf_field() ?>
-      <div class="account-field">
-        <label class="account-label" for="email">Email</label>
-        <input class="account-input" id="email" type="email" name="email" required autofocus>
-      </div>
-      <button class="account-submit" type="submit">Send reset link</button>
-    </form>
+    <div class="field">
+      <label class="label" for="email">Email</label>
+      <input class="input" id="email" type="email" name="email" required autofocus autocomplete="username" placeholder="name@company.com">
+    </div>
 
-    <p class="account-foot"><a href="index.php">Back to sign in</a></p>
-  </main>
-</body>
-</html>
+    <button class="btn btn-primary btn-block" type="submit">Send reset link</button>
+  </form>
+
+  <p class="text-center text-[13px] m-0"><a href="index.php" class="link">Back to sign in</a></p>
+</div>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>

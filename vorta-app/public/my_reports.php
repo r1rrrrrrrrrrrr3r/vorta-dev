@@ -2,703 +2,243 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/ui.php';
+require_once __DIR__ . '/../lib/reports.php';
 require_once __DIR__ . '/../lib/tenant.php';
-require_once __DIR__ . '/../lib/uploads.php';
 require_login();
 
 $user_id = $_SESSION['user']['user_id'];
 $company_id = current_company_id();
 $detailOwnerId = (int)$user_id;
 
-$detailSelf = basename(__FILE__);
-
-function report_detail_e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
-
-function report_detail_fetch(PDO $pdo, int $reportId, ?int $ownerId): ?array
-{
-    $companyId = current_company_id();
-    $sql = "SELECT pr.*, u.name AS user_name, wf.workforce_name
-            FROM production_reports pr
-            LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id
-            JOIN users u ON u.user_id = pr.user_id AND u.company_id = pr.company_id
-            WHERE pr.report_id = ? AND pr.company_id = ?";
-    $params = [$reportId, $companyId];
-    if ($ownerId !== null) {
-        $sql .= " AND pr.user_id = ?";
-        $params[] = $ownerId;
-    }
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $found = $stmt->fetch();
-    return $found ?: null;
-}
-
 if (isset($_GET['proof_image'])) {
-    $row = report_detail_fetch($pdo, (int)$_GET['proof_image'], $detailOwnerId);
-    $file = $row ? basename((string)$row['proof_image']) : '';
-    $path = $row ? upload_absolute_path((string)$row['proof_image']) : null;
-    $mime = ($file !== '' && $path && is_file($path)) ? mime_content_type($path) : false;
-    if (!$mime || strpos($mime, 'image/') !== 0) {
-        http_response_code(404);
-        exit;
-    }
-    header('Content-Type: ' . $mime);
-    header('Content-Length: ' . filesize($path));
-    header('Cache-Control: private, max-age=3600');
-    readfile($path);
-    exit;
+    report_proof_image_output($pdo, (int)$_GET['proof_image'], $detailOwnerId);
 }
 
 if (isset($_GET['detail'])) {
-    $row = report_detail_fetch($pdo, (int)$_GET['detail'], $detailOwnerId);
-    if (!$row) {
-        http_response_code(404);
-        echo '<p class="text-red-600">Report not found or access denied.</p>';
-        exit;
-    }
-
-    $status = $row['status'] ?? 'Progress';
-    $statusClass = $status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-    $timestamp = strtotime((string) $row['report_date']);
-    $dateLabel = $timestamp ? date('d M Y', $timestamp) : '-';
-    $description = trim((string) ($row['description'] ?? ''));
-    $rawLink = trim((string) ($row['proof_link'] ?? ''));
-    $isHttp = (bool) preg_match('#^https?://#i', $rawLink);
-    $imageFile = basename(trim((string) ($row['proof_image'] ?? '')));
-    $hasImage = $imageFile !== '';
-    $imageExists = $hasImage && upload_absolute_path((string)$row['proof_image']) !== null;
-    $imageUrl = $detailSelf . '?proof_image=' . (int) $row['report_id'];
-
-    $card = 'background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;';
-    $label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:4px;';
-    $value = 'font-size:14px;font-weight:600;color:var(--text);word-break:break-word;';
-    $section = 'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;';
-    ?>
-<div style="display:flex;flex-direction:column;gap:18px;">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-    <h4 style="font-size:18px;font-weight:700;line-height:1.3;color:var(--text);word-break:break-word;"><?= report_detail_e($row['title']) ?></h4>
-    <span class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap <?= $statusClass ?>"><?= report_detail_e($status) ?></span>
-  </div>
-
-  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Date</div>
-      <div style="<?= $value ?>"><?= report_detail_e($dateLabel) ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Submitted By</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['user_name']) ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Job Type</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['job_type'] ?? '-') ?></div>
-    </div>
-    <div style="<?= $card ?>">
-      <div style="<?= $label ?>">Work Force</div>
-      <div style="<?= $value ?>"><?= report_detail_e($row['workforce_name'] ?? '-') ?></div>
-    </div>
-  </div>
-
-  <div>
-    <div style="<?= $section ?>">Description</div>
-    <div style="<?= $card ?>font-size:14px;line-height:1.6;color:var(--text);word-break:break-word;">
-      <?php if ($description !== ''): ?>
-        <?= nl2br(report_detail_e($description)) ?>
-      <?php else: ?>
-        <span style="color:var(--text-faint);font-style:italic;">No description provided.</span>
-      <?php endif; ?>
-    </div>
-  </div>
-
-  <div>
-    <div style="<?= $section ?>">Proof</div>
-    <?php if ($rawLink === '' && !$hasImage): ?>
-      <div style="<?= $card ?>font-size:14px;color:var(--text-faint);font-style:italic;">No proof attached.</div>
-    <?php else: ?>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <?php if ($rawLink !== ''): ?>
-          <div style="<?= $card ?>display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div style="min-width:0;flex:1;">
-              <div style="<?= $label ?>">Link</div>
-              <?php if ($isHttp): ?>
-                <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
-                  style="font-size:14px;color:var(--brand);text-decoration:underline;word-break:break-all;"><?= report_detail_e($rawLink) ?></a>
-              <?php else: ?>
-                <span style="font-size:14px;color:var(--text);word-break:break-all;"><?= report_detail_e($rawLink) ?></span>
-              <?php endif; ?>
-            </div>
-            <?php if ($isHttp): ?>
-              <a href="<?= report_detail_e($rawLink) ?>" target="_blank" rel="noopener noreferrer"
-                class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition whitespace-nowrap">Open</a>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
-
-        <?php if ($hasImage): ?>
-          <div style="<?= $card ?>">
-            <div style="<?= $label ?>margin-bottom:8px;">Photo</div>
-            <?php if ($imageExists): ?>
-              <a href="<?= report_detail_e($imageUrl) ?>" target="_blank" rel="noopener noreferrer">
-                <img src="<?= report_detail_e($imageUrl) ?>" alt="Proof photo" loading="lazy"
-                  onerror="this.parentNode.style.display='none';this.parentNode.nextElementSibling.style.display='block';"
-                  style="display:block;max-width:100%;max-height:300px;margin:0 auto;border-radius:10px;object-fit:contain;">
-              </a>
-              <div style="display:none;font-size:14px;color:var(--text-faint);font-style:italic;">The photo could not be loaded.</div>
-            <?php else: ?>
-              <div style="font-size:14px;color:var(--text-faint);font-style:italic;">The photo file could not be found on the server.</div>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
-      </div>
-    <?php endif; ?>
-  </div>
-</div>
-<?php
-    exit;
+    report_detail_output($pdo, (int)$_GET['detail'], $detailOwnerId, basename(__FILE__));
 }
 
-$month = $_GET['month'] ?? date('Y-m');
+$month = valid_month($_GET['month'] ?? null);
 $start = $month . "-01";
 $end = date('Y-m-t', strtotime($start));
-$limit = 7;
+$limit = 20;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 $monthlyTarget = settings_get_monthly_target($pdo);
 $dailyMin = settings_get_daily_min_reports($pdo);
-$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?");
-$totalStmt->execute([$user_id, $company_id, $start, $end]);
-$total = (int)$totalStmt->fetchColumn();
-$totalPages = max(1, ceil($total / $limit));
 
-$stmt = $pdo->prepare("SELECT 
+$statusFilter = in_array($_GET['status'] ?? '', ['Progress', 'Completed'], true) ? $_GET['status'] : '';
+$q = trim((string) ($_GET['q'] ?? ''));
+
+$where = "pr.user_id = ? AND pr.company_id = ? AND pr.report_date BETWEEN ? AND ?";
+$params = [$user_id, $company_id, $start, $end];
+if ($statusFilter !== '') {
+    $where .= " AND pr.status = ?";
+    $params[] = $statusFilter;
+}
+if ($q !== '') {
+    $where .= " AND pr.title LIKE ?";
+    $params[] = '%' . $q . '%';
+}
+
+$totalStmt = $pdo->prepare("SELECT COUNT(*) FROM production_reports pr WHERE $where");
+$totalStmt->execute($params);
+$total = (int)$totalStmt->fetchColumn();
+
+$stmt = $pdo->prepare("SELECT
         pr.*,
         wf.workforce_name
     FROM production_reports pr
     LEFT JOIN work_force wf ON wf.workforce_id = pr.workforce_id AND wf.company_id = pr.company_id
-    WHERE pr.user_id = ? AND pr.company_id = ?
-      AND pr.report_date BETWEEN ? AND ?
+    WHERE $where
     ORDER BY pr.report_date DESC, pr.report_id DESC
     LIMIT $limit OFFSET $offset");
-$stmt->execute([$user_id, $company_id, $start, $end]);
+$stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-$stmt2 = $pdo->prepare("SELECT DATE(report_date) d, COUNT(*) c 
-                        FROM production_reports 
-                        WHERE user_id = ? AND company_id = ? AND report_date BETWEEN ? AND ?
-                        GROUP BY DATE(report_date)");
-$stmt2->execute([$user_id, $company_id, $start, $end]);
-$daily = $stmt2->fetchAll();
+$dailyCounts = report_daily_counts($pdo, (int) $user_id, $start, $end);
+$monthCount = array_sum($dailyCounts);
+$min = (int) $monthlyTarget['min'];
+$max = max(1, (int) $monthlyTarget['max']);
 
-$labels = [];
-$data = [];
-foreach ($daily as $r) {
-  $labels[] = $r['d'];
-  $data[] = (int)$r['c'];
-}
-include __DIR__ . '/header.php';
+$hasFilters = $statusFilter !== '' || $q !== '';
+
+$pageTitle = 'My reports';
+$activeNav = 'my_reports';
+include __DIR__ . '/../views/layout/start.php';
 ?>
+<?= page_header('My reports', 'Your submitted work', '<a class="btn btn-primary" href="report_form.php">' . icon('plus') . 'New report</a>') ?>
 
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vorta Prodtracker - My Reports</title>
-  <link rel="stylesheet" href="css/output.css">
-</head>
-
-<body>
-  <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6 md:p-8">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">My Reports</h1>
-            <div class="flex items-center gap-4 mt-2">
-              <span class="text-base md:text-lg font-semibold text-indigo-600"><?php echo htmlspecialchars($month) ?></span>
-              <span class="px-3 py-1 bg-indigo-100 text-indigo-800 text-sm font-medium rounded-full">
-                Total: <?php echo (int)$total ?> item
-              </span>
-            </div>
-          </div>
-          <form class="flex flex-col sm:flex-row items-center gap-2">
-            <input type="month" name="month" value="<?php echo htmlspecialchars($month) ?>"
-              class="px-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-            <button type="submit" class="px-4 py-2 w-full md:w-[69px] bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
-              Filter
-            </button>
-          </form>
-        </div>
-
-        <div class="bg-indigo-50 p-4 rounded-lg mb-6">
-          <p class="text-sm text-indigo-800">
-            <span class="font-medium">Monthly Target:</span>
-            <?= (int) $monthlyTarget['min'] ?>–<?= (int) $monthlyTarget['max'] ?> items (minimum <?= $dailyMin ?> item<?= $dailyMin > 1 ? 's' : '' ?> per day)
-          </p>
-        </div>
-
-        <div class="h-64">
-          <canvas id="chart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6 md:p-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">Entry Details</h2>
-
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="text-left border-b border-gray-200">
-                <th class="pb-3 font-medium text-gray-600">Date</th>
-                <th class="pb-3 font-medium text-gray-600">Type</th>
-                <th class="pb-3 font-medium text-gray-600">Title</th>
-                <th class="pb-3 font-medium text-gray-600">Work Force</th>
-                <th class="pb-3 font-medium text-gray-600">Status</th>
-                <th class="pb-3 font-medium text-gray-600">Proof</th>
-                <th class="pb-3 font-medium text-gray-600">
-                  <span class="inline-block text-center" style="width:104px;">Action</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <?php foreach ($rows as $r):
-                $hasLink = trim((string)($r['proof_link'] ?? '')) !== '';
-                $hasImage = trim((string)($r['proof_image'] ?? '')) !== '';
-              ?>
-                <tr class="hover:bg-gray-50 transition" id="row-<?php echo $r['report_id']; ?>">
-                  <td class="py-4 whitespace-nowrap text-sm text-gray-600">
-                    <?php echo htmlspecialchars($r['report_date']) ?>
-                  </td>
-                  <td class="py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                    <?php echo htmlspecialchars($r['job_type']) ?>
-                  </td>
-                  <td class="py-4 whitespace-nowrap text-sm">
-                    <button type="button" onclick="openModal(<?php echo (int)$r['report_id']; ?>)"
-                      class="text-left text-gray-800 hover:text-indigo-600 hover:underline transition" style="cursor:pointer;" title="View report detail">
-                      <?php echo htmlspecialchars($r['title']) ?>
-                    </button>
-                  </td>
-                  <td class="py-4 whitespace-nowrap text-[10px] sm:text-sm font-medium text-gray-800">
-                    <?php echo htmlspecialchars($r['workforce_name'] ?? '-'); ?>
-                  </td>
-                  <td class="py-4 whitespace-nowrap">
-                    <span
-                      class="status-badge px-2.5 py-1 rounded-full text-xs font-medium 
-      <?php echo $r['status'] === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; ?>"
-                      id="status-<?php echo $r['report_id']; ?>">
-                      <?php echo htmlspecialchars($r['status']); ?>
-                    </span>
-                  </td>
-
-                  <td class="py-4 whitespace-nowrap">
-                    <?php if ($hasLink || $hasImage): ?>
-                      <button type="button"
-                        onclick="showProof(this)"
-                        data-link="<?php echo htmlspecialchars(trim((string)($r['proof_link'] ?? '')), ENT_QUOTES) ?>"
-                        data-image="<?php echo $hasImage ? 'my_reports.php?proof_image=' . (int)$r['report_id'] : '' ?>"
-                        class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-sm transition">
-                        View
-                      </button>
-                    <?php else: ?>
-                      <span class="text-gray-400 text-sm">-</span>
-                    <?php endif; ?>
-                  </td>
-
-                  <td class="py-4 whitespace-nowrap">
-                    <div class="flex items-center gap-1">
-                      <?php if ($r['status'] === 'Progress'): ?>
-                        <button
-                          onclick="markAsDone(<?php echo $r['report_id']; ?>, this)"
-                          style="width:104px;"
-                          class="inline-flex items-center justify-center h-8 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition">
-                          Mark Complete
-                        </button>
-
-                        <a href="edit_report.php?id=<?php echo $r['report_id']; ?>"
-                          id="edit-<?php echo $r['report_id']; ?>"
-                          title="Edit report" aria-label="Edit report"
-                          class="inline-flex items-center justify-center w-8 h-8 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition">
-                          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                          </svg>
-                        </a>
-                      <?php else: ?>
-                        <span class="text-gray-400 text-sm" style="display:inline-block;width:104px;text-align:center;">
-                          Completed
-                        </span>
-
-                        <span
-                          title="Completed reports cannot be edited" aria-disabled="true"
-                          class="inline-flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-400 rounded cursor-not-allowed">
-                          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                          </svg>
-                        </span>
-                      <?php endif; ?>
-
-                      <button
-                        onclick="deleteReport(<?php echo $r['report_id']; ?>, this)"
-                        title="Delete report" aria-label="Delete report"
-                        class="inline-flex items-center justify-center w-8 h-8 bg-red-600 text-white rounded hover:bg-red-700 transition">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-        <?php if ($totalPages > 1): ?>
-          <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div class="text-sm text-gray-600 whitespace-nowrap">
-              Showing <?= count($rows) ?> of <?= $total ?> records (Page <?= $page ?> of <?= $totalPages ?>)
-            </div>
-            <nav class="flex flex-wrap justify-center gap-1">
-              <?php if ($page > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=1"
-                  class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
-                  &laquo; First
-                </a>
-              <?php else: ?>
-                <span class="px-3 py-2 bg-gray-100 text-gray-400 border border-gray-300 rounded-lg text-sm font-medium cursor-not-allowed">
-                  &laquo; First
-                </span>
-              <?php endif; ?>
-
-              <?php if ($page > 1): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page - 1 ?>"
-                  class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
-                  &lsaquo; Prev
-                </a>
-              <?php else: ?>
-                <span class="px-3 py-2 bg-gray-100 text-gray-400 border border-gray-300 rounded-lg text-sm font-medium cursor-not-allowed">
-                  &lsaquo; Prev
-                </span>
-              <?php endif; ?>
-
-              <?php
-              $startPage = max(1, $page - 2);
-              $endPage = min($totalPages, $page + 2);
-
-              for ($i = $startPage; $i <= $endPage; $i++): ?>
-                <?php if ($i == $page): ?>
-                  <span class="px-3 py-2 bg-indigo-600 text-white border border-gray-300 rounded-lg text-sm font-medium">
-                    <?= $i ?>
-                  </span>
-                <?php else: ?>
-                  <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $i ?>"
-                    class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
-                    <?= $i ?>
-                  </a>
-                <?php endif; ?>
-              <?php endfor; ?>
-
-              <?php if ($page < $totalPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $page + 1 ?>"
-                  class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
-                  Next &rsaquo;
-                </a>
-              <?php else: ?>
-                <span class="px-3 py-2 bg-gray-100 text-gray-400 border border-gray-300 rounded-lg text-sm font-medium cursor-not-allowed">
-                  Next &rsaquo;
-                </span>
-              <?php endif; ?>
-
-              <?php if ($page < $totalPages): ?>
-                <a href="?month=<?= htmlspecialchars($month) ?>&page=<?= $totalPages ?>"
-                  class="px-3 py-2 bg-white text-indigo-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition">
-                  Last &raquo;
-                </a>
-              <?php else: ?>
-                <span class="px-3 py-2 bg-gray-100 text-gray-400 border border-gray-300 rounded-lg text-sm font-medium cursor-not-allowed">
-                  Last &raquo;
-                </span>
-              <?php endif; ?>
-            </nav>
-          </div>
-        <?php endif; ?>
-      </div>
-
-    </div>
+<section class="card card-body grid gap-6 md:grid-cols-[240px_1fr] items-end">
+  <div>
+    <div class="section-label"><?= e(fmt_month($month)) ?></div>
+    <div class="big-number mb-3"><?= (int) $monthCount ?> <small>reports</small></div>
+    <?= progress_bar(min(100, $monthCount / $max * 100), [
+        ['pct' => $min / $max * 100, 'label' => 'min ' . $min],
+        ['pct' => 100, 'label' => 'max ' . $max],
+    ], true) ?>
   </div>
-</body>
+  <?= daybars($month, $dailyCounts, $dailyMin) ?>
+</section>
 
-</html>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-  const labels = <?php echo json_encode($labels); ?>;
-  const data = <?php echo json_encode($data); ?>;
-  new Chart(document.getElementById('chart'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Items per Day',
-        data,
-        backgroundColor: 'rgba(79, 70, 229, 0.7)',
-        borderColor: 'rgba(79, 70, 229, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            stepSize: 1
-          }
-        }
-      },
-      plugins: {
-        legend: {
-          display: false
-        }
-      }
-    }
-  });
-
-  function markAsDone(reportId, btn) {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: "Mark this report as completed?",
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, mark it!',
-      cancelButtonText: 'Cancel'
-    }).then((res) => {
-      if (res.isConfirmed) {
-        const originalText = btn.textContent;
-        btn.textContent = 'Processing...';
-        btn.disabled = true;
-
-        fetch('update_status_ajax.php', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin',
-            body: 'report_id=' + reportId + '&action=mark_done'
-          })
-          .then(r => r.json())
-          .then(d => {
-            if (d.success) {
-              const statusEl = document.getElementById('status-' + reportId);
-              statusEl.textContent = 'Completed';
-              statusEl.className = 'status-badge px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800';
-
-              const done = document.createElement('span');
-              done.className = 'text-gray-400 text-sm';
-              done.style.cssText = 'display:inline-block;width:104px;text-align:center;';
-              done.textContent = 'Completed';
-              btn.replaceWith(done);
-
-              const editLink = document.getElementById('edit-' + reportId);
-              if (editLink) {
-                const disabledEdit = document.createElement('span');
-                disabledEdit.title = 'Completed reports cannot be edited';
-                disabledEdit.setAttribute('aria-disabled', 'true');
-                disabledEdit.className = 'inline-flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-400 rounded cursor-not-allowed';
-                disabledEdit.innerHTML = editLink.innerHTML;
-                editLink.replaceWith(disabledEdit);
-              }
-
-              Swal.fire('Success!', 'Report status updated.', 'success');
-            }
-          })
-          .catch(e => {
-            console.error(e);
-            Swal.fire('Error', 'A connection error occurred.', 'error');
-            btn.textContent = originalText;
-            btn.disabled = false;
-          });
-      }
-    });
-  }
-
-  function deleteReport(reportId, btn) {
-  Swal.fire({
-    title: 'Are you sure?',
-    text: "This report will be permanently deleted!",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#3085d6',
-    confirmButtonText: 'Yes, delete it!',
-    cancelButtonText: 'Cancel'
-  }).then((res) => {
-    if (res.isConfirmed) {
-      const row = document.getElementById('row-' + reportId);
-      btn.disabled = true;
-      btn.classList.add('opacity-50', 'cursor-not-allowed');
-
-      fetch('delete_report_ajax.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          credentials: 'same-origin',
-          body: 'report_id=' + reportId
-        })
-        .then(r => r.json())
-        .then(d => {
-          if (d.success) {
-            row.classList.add('bg-red-50', 'animate-pulse');
-            setTimeout(() => {
-              row.remove();
-              Swal.fire('Deleted!', 'Report successfully deleted.', 'success');
-            }, 300);
-          } else {
-            Swal.fire('Failed!', d.message, 'error');
-            btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
-          }
-        })
-        .catch(e => {
-          console.error(e);
-          Swal.fire('Error', 'A connection error occurred.', 'error');
-          btn.disabled = false;
-          btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        });
-      }
-    });
-  }
-</script>
-
-<div id="reportModal" class="fixed inset-0 hidden z-50" style="background: rgba(15, 23, 42, 0.55);">
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white overflow-hidden"
-    style="width: calc(100% - 2rem); max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed);">
-      <div>
-        <p style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .8;">Production Report</p>
-        <h3 style="font-size: 17px; font-weight: 700; line-height: 1.2;">Report Detail</h3>
-      </div>
-      <button onclick="closeModal()" aria-label="Close"
-        style="width: 32px; height: 32px; border-radius: 9999px; background: rgba(255, 255, 255, .18); color: #fff; font-size: 20px; line-height: 1; cursor: pointer;">
-        &times;
-      </button>
-    </div>
-    <div id="modalContent" style="padding: 20px; overflow-y: auto;"></div>
-    <div style="padding: 12px 20px; text-align: right; border-top: 1px solid var(--border);">
-      <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium transition">
-        Close
-      </button>
-    </div>
-  </div>
+<div id="my-reports" class="page-section">
+<div class="toolbar">
+  <?= period_picker('month', $month, 'month', ['page']) ?>
+  <nav class="seg" aria-label="Filter by status">
+    <?php foreach (['' => 'All', 'Progress' => 'In progress', 'Completed' => 'Completed'] as $val => $lbl): ?>
+      <a href="<?= e(query_url(['status' => $val ?: null, 'page' => null])) ?>" data-query-own="status,page" class="<?= $statusFilter === $val ? 'is-active' : '' ?>"<?= $statusFilter === $val ? ' aria-current="true"' : '' ?>><?= $lbl ?></a>
+    <?php endforeach; ?>
+  </nav>
+  <form method="get" id="mr-filters" class="input-icon" role="search" data-turbo-frame="mr-results" data-turbo-action="replace">
+    <input type="hidden" name="month" value="<?= e($month) ?>">
+    <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= e($statusFilter) ?>"><?php endif; ?>
+    <?= icon('magnifying-glass') ?>
+    <label for="mr-search" class="sr-only">Search titles</label>
+    <input type="search" id="mr-search" name="q" class="input" placeholder="Search titles…" value="<?= e($q) ?>">
+  </form>
 </div>
 
+<turbo-frame id="mr-results" class="results-frame" data-turbo-action="advance" autoscroll data-autoscroll-block="start">
+<div class="toolbar"><span class="toolbar-count"><?= $total ?> report<?= $total === 1 ? '' : 's' ?></span></div>
+<section class="card">
+  <?php if (empty($rows)): ?>
+    <?php if ($hasFilters): ?>
+      <?= empty_state('No reports match these filters', 'Try another month or clear the filters.', '<a class="btn btn-secondary btn-sm" href="' . e(query_url(['status' => null, 'q' => null, 'page' => null])) . '" data-turbo-frame="_top">Clear filters</a>') ?>
+    <?php else: ?>
+      <?= empty_state('No reports in ' . fmt_month($month), 'Reports you submit this month will appear here.', '<a class="btn btn-primary" href="report_form.php">' . icon('plus') . 'New report</a>') ?>
+    <?php endif; ?>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Title</th>
+            <th class="max-sm:hidden">Work force</th>
+            <th>Status</th>
+            <th class="col-actions"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($rows as $r):
+            $id = (int) $r['report_id'];
+            $isDone = $r['status'] === 'Completed';
+          ?>
+            <tr id="row-<?= $id ?>" class="is-clickable" tabindex="0" data-drawer-url="my_reports.php?detail=<?= $id ?>"
+              data-drawer-title="<?= e($r['title']) ?>" data-drawer-eyebrow="Report">
+              <td class="whitespace-nowrap"><?= e(fmt_date($r['report_date'], 'short')) ?></td>
+              <td><span class="cell-strong"><?= e($r['title']) ?></span><span class="cell-sub"><?= e($r['job_type']) ?></span></td>
+              <td class="max-sm:hidden"><?= e($r['workforce_name'] ?? '–') ?></td>
+              <td class="whitespace-nowrap" data-status-cell>
+                <?= status_pill($r['status']) ?>
+                <?php if (!$isDone): ?>
+                  <button type="button" class="link text-[13px] block mt-1 sm:inline sm:mt-0 sm:ml-2" data-mark-done="<?= $id ?>">Mark completed</button>
+                <?php endif; ?>
+              </td>
+              <td class="col-actions">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" data-menu-trigger aria-controls="menu-<?= $id ?>" aria-expanded="false" aria-haspopup="menu"
+                  aria-label="Actions for <?= e($r['title']) ?>"><?= icon('ellipsis-horizontal') ?></button>
+                <div class="menu" id="menu-<?= $id ?>" role="menu" hidden>
+                  <button type="button" class="menu-item" role="menuitem" data-view-report="<?= $id ?>"><?= icon('eye') ?>View details</button>
+                  <?php if ($isDone): ?>
+                    <span class="menu-item" role="menuitem" aria-disabled="true" title="Completed reports can't be edited" data-edit-item><?= icon('pencil') ?>Edit</span>
+                  <?php else: ?>
+                    <a class="menu-item" role="menuitem" href="edit_report.php?id=<?= $id ?>" data-edit-item><?= icon('pencil') ?>Edit</a>
+                  <?php endif; ?>
+                  <div class="menu-sep"></div>
+                  <button type="button" class="menu-item menu-item-danger" role="menuitem" data-delete-report="<?= $id ?>"
+                    data-title="<?= e($r['title']) ?>" data-date="<?= e(fmt_date($r['report_date'])) ?>"><?= icon('trash') ?>Delete…</button>
+                </div>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?= pagination($page, $limit, $total) ?>
+  <?php endif; ?>
+</section>
+</turbo-frame>
+</div>
+
+<a class="fab md:hidden" href="report_form.php" aria-label="New report"><?= icon('plus') ?></a>
+
 <script>
-  function openModal(reportId) {
-    document.getElementById('modalContent').innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
-    document.getElementById('reportModal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+(function () {
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+      body: body
+    }).then(r => r.json());
+  }
 
-    fetch('my_reports.php?detail=' + encodeURIComponent(reportId), {
-        credentials: 'same-origin'
-      })
-      .then(r => r.text())
-      .then(d => {
-        document.getElementById('modalContent').innerHTML = d;
-      })
-      .catch(err => {
-        console.error(err);
-        document.getElementById('modalContent').innerHTML = '<p class="text-red-600">An error occurred while loading the data</p>';
+  // Listener di root halaman (elemen baru tiap render, jadi tidak menumpuk); root mencakup frame hasil.
+  const root = document.getElementById('my-reports');
+  if (!root) return;
+  root.addEventListener('click', function (e) {
+    const view = e.target.closest('[data-view-report]');
+    if (view) {
+      const row = document.getElementById('row-' + view.dataset.viewReport);
+      Vorta.drawer.open({ url: row.dataset.drawerUrl, title: row.dataset.drawerTitle, eyebrow: 'Report' });
+      return;
+    }
+
+    const done = e.target.closest('[data-mark-done]');
+    if (done) {
+      const id = done.dataset.markDone;
+      Vorta.confirm({ title: 'Mark as completed?', message: "Completed reports can't be edited.", confirmText: 'Mark completed' })
+        .then(ok => {
+          if (!ok) return;
+          done.disabled = true;
+          post('update_status_ajax.php', 'report_id=' + encodeURIComponent(id) + '&action=mark_done')
+            .then(d => {
+              if (!d.success) throw new Error(d.message || '');
+              const row = document.getElementById('row-' + id);
+              row.querySelector('[data-status-cell]').innerHTML = '<span class="pill pill-ok">Completed</span>';
+              const edit = row.querySelector('[data-edit-item]');
+              if (edit) {
+                const span = document.createElement('span');
+                span.className = 'menu-item';
+                span.setAttribute('role', 'menuitem');
+                span.setAttribute('aria-disabled', 'true');
+                span.title = "Completed reports can't be edited";
+                span.dataset.editItem = '';
+                span.innerHTML = edit.innerHTML;
+                edit.replaceWith(span);
+              }
+              Vorta.toast('Marked as completed');
+            })
+            .catch(err => {
+              done.disabled = false;
+              Vorta.toast(err.message || "Couldn't update the status. Try again.", { tone: 'bad' });
+            });
+        });
+      return;
+    }
+
+    const del = e.target.closest('[data-delete-report]');
+    if (del) {
+      const id = del.dataset.deleteReport;
+      Vorta.confirm({
+        title: 'Delete this report?',
+        message: '“' + del.dataset.title + '” on ' + del.dataset.date + " will be removed. This can't be undone.",
+        confirmText: 'Delete report',
+        tone: 'danger'
+      }).then(ok => {
+        if (!ok) return;
+        post('delete_report_ajax.php', 'report_id=' + encodeURIComponent(id))
+          .then(d => {
+            if (!d.success) throw new Error(d.message || '');
+            document.getElementById('row-' + id)?.remove();
+            Vorta.toast('Report deleted');
+          })
+          .catch(err => Vorta.toast(err.message || "Couldn't delete the report. Try again.", { tone: 'bad' }));
       });
-  }
-
-  function closeModal() {
-    document.getElementById('reportModal').classList.add('hidden');
-    document.body.style.overflow = 'auto';
-  }
-
-  document.getElementById('reportModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
+    }
   });
-
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeModal();
-  });
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  function escapeAttr(text) {
-    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
-  function swalTheme() {
-    const dark = window.VortaUI && window.VortaUI.getTheme() === 'dark';
-    return dark ? {
-      background: '#1e293b',
-      color: '#e2e8f0'
-    } : {
-      background: '#ffffff',
-      color: '#1f2937'
-    };
-  }
-
-  function showProof(btn) {
-  const link = (btn.dataset.link || '').trim();
-  const image = btn.dataset.image || '';
-  const isHttp = /^https?:\/\//i.test(link);
-  const label = 'font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px;';
-
-  let html = '<div style="display:flex;flex-direction:column;gap:16px;text-align:left;">';
-
-  if (image) {
-    html += `<div data-proof-photo>
-      <div style="${label}">Photo</div>
-      <a href="${escapeAttr(image)}" target="_blank" rel="noopener noreferrer">
-        <img src="${escapeAttr(image)}" alt="Proof photo" onerror="this.closest('[data-proof-photo]').style.display='none'"
-          style="display:block;max-width:100%;max-height:320px;margin:0 auto;border-radius:12px;object-fit:contain;border:1px solid rgba(148,163,184,.35);">
-      </a>
-    </div>`;
-  }
-
-  if (link) {
-    const linkHtml = isHttp ?
-      `<a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" style="color:#6366f1;text-decoration:underline;">${escapeHtml(link)}</a>` :
-      escapeHtml(link);
-    html += `<div>
-      <div style="${label}">Link</div>
-      <div style="border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:10px 14px;font-size:14px;word-break:break-all;">${linkHtml}</div>
-    </div>`;
-  }
-
-  html += '</div>';
-
-  Swal.fire(Object.assign({
-    title: 'Report Proof',
-    html: html,
-    width: 560,
-    showCloseButton: true,
-    showConfirmButton: isHttp,
-    confirmButtonText: 'Open Link',
-    confirmButtonColor: '#4f46e5',
-    showCancelButton: true,
-    cancelButtonText: 'Close'
-    }, swalTheme())).then((result) => {
-      if (result.isConfirmed && isHttp) {
-        window.open(link, '_blank', 'noopener,noreferrer');
-      }
-    });
-  }
+})();
 </script>
-
-<?php include __DIR__ . '/footer.php'; ?>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>

@@ -2,20 +2,41 @@
 require_once __DIR__ . '/../lib/csrf.php';
 
 $uiTheme = $_SESSION['user']['theme'] ?? '';
-$uiLayout = $_SESSION['user']['nav_layout'] ?? '';
 $uiCsrfToken = csrf_token();
 ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/theme.css">
+<?= csrf_meta() ?>
+<script>
+  // Semua fetch POST same-origin otomatis membawa header X-CSRF-Token (dibaca dari meta, jadi tetap benar setelah navigasi Turbo).
+  (function () {
+    if (window.__vortaCsrfFetch || !window.fetch) return;
+    window.__vortaCsrfFetch = true;
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      init = init || {};
+      var method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var sameOrigin = true;
+      try { sameOrigin = new URL(url, location.href).origin === location.origin; } catch (e) {}
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      if (method !== 'GET' && method !== 'HEAD' && sameOrigin && meta) {
+        var headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+        if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', meta.content);
+        init = Object.assign({}, init, { headers: headers });
+      }
+      return nativeFetch(input, init);
+    };
+  })();
+</script>
 <script>
   (function () {
     var serverTheme = <?= json_encode($uiTheme ?: null) ?>;
-    var serverLayout = <?= json_encode($uiLayout ?: null) ?>;
-
+    // Turbo menjalankan ulang script ini kalau isinya berubah (mis. setelah login / tema berubah):
+    // cukup terapkan tema server, jangan pasang listener dua kali.
+    if (window.VortaUI) {
+      if (serverTheme) window.VortaUI.setTheme(serverTheme, false);
+      return;
+    }
     var THEMES = ['light', 'dark', 'system'];
-    var LAYOUTS = ['navbar', 'sidebar'];
 
     function read(key) {
       try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -27,9 +48,6 @@ $uiCsrfToken = csrf_token();
     var themePref = serverTheme || read('vorta-theme') || 'system';
     if (THEMES.indexOf(themePref) === -1) themePref = 'system';
 
-    var layout = serverLayout || read('vorta-nav') || 'sidebar';
-    if (LAYOUTS.indexOf(layout) === -1) layout = 'sidebar';
-
     var mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     function resolveTheme(pref) {
@@ -40,10 +58,10 @@ $uiCsrfToken = csrf_token();
     var root = document.documentElement;
     root.setAttribute('data-theme-pref', themePref);
     root.setAttribute('data-theme', resolveTheme(themePref));
-    root.setAttribute('data-nav', layout);
 
     function persist(body) {
-      body += '&csrf_token=' + encodeURIComponent(<?= json_encode($uiCsrfToken) ?>);
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      body += '&csrf_token=' + encodeURIComponent(csrfMeta ? csrfMeta.content : <?= json_encode($uiCsrfToken) ?>);
       fetch('save_preferences.php', {
         method: 'POST',
         headers: {
@@ -59,8 +77,7 @@ $uiCsrfToken = csrf_token();
       document.dispatchEvent(new CustomEvent('vorta:uichange', {
         detail: {
           themePreference: root.getAttribute('data-theme-pref'),
-          theme: root.getAttribute('data-theme'),
-          layout: root.getAttribute('data-nav')
+          theme: root.getAttribute('data-theme')
         }
       }));
     }
@@ -72,9 +89,6 @@ $uiCsrfToken = csrf_token();
       getTheme: function () {
         return root.getAttribute('data-theme') || 'light';
       },
-      getLayout: function () {
-        return root.getAttribute('data-nav') || 'navbar';
-      },
       setTheme: function (pref, persistIt) {
         if (THEMES.indexOf(pref) === -1) return;
         root.setAttribute('data-theme-pref', pref);
@@ -82,18 +96,6 @@ $uiCsrfToken = csrf_token();
         write('vorta-theme', pref);
         emit();
         if (persistIt !== false) persist('theme=' + encodeURIComponent(pref));
-      },
-      setLayout: function (value, persistIt) {
-        if (LAYOUTS.indexOf(value) === -1) return;
-        root.setAttribute('data-nav', value);
-        write('vorta-nav', value);
-
-        var shell = document.querySelector('.vorta-shell');
-        if (shell) shell.classList.remove('is-open');
-        var backdrop = document.querySelector('.vorta-backdrop');
-        if (backdrop) backdrop.classList.remove('is-open');
-        emit();
-        if (persistIt !== false) persist('nav_layout=' + encodeURIComponent(value));
       }
     };
 

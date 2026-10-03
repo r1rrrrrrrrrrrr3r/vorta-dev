@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/account.php';
+require_once __DIR__ . '/../lib/ui.php';
 
 $token = (string)($_GET['token'] ?? $_POST['token'] ?? '');
 $stmt = $pdo->prepare("
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $invite) {
                 $stmt = $pdo->prepare("UPDATE company_invitations SET accepted_at = NOW() WHERE invitation_id = ?");
                 $stmt->execute([$invite['invitation_id']]);
                 $pdo->commit();
-                header('Location: index.php');
+                header('Location: index.php', true, 303);
                 exit;
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) {
@@ -46,51 +47,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $invite) {
         }
     }
 }
-?>
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Accept invitation - Vorta Prodtracker</title>
-  <link rel="stylesheet" href="css/output.css">
-  <?php include __DIR__ . '/ui_head.php'; ?>
-</head>
-<body class="account-shell">
-  <main class="account-card">
-    <div class="account-brand">
-      <img src="../images/vorta.png" alt="Vorta">
-      <div>
-        <div class="account-brand-name">Vorta Prodtracker</div>
-        <div class="account-brand-sub">Productivity System</div>
-      </div>
-    </div>
+if ($error !== '') {
+    http_response_code(422);
+}
 
-    <?php if (!$invite): ?>
-      <h1 class="account-title">Invitation unavailable</h1>
-      <p class="account-copy">This invitation is invalid, expired, or has already been accepted. Ask your company administrator for a new link.</p>
-      <p class="account-foot"><a href="index.php">Back to sign in</a></p>
-    <?php else: ?>
-      <h1 class="account-title">Join your company</h1>
-      <p class="account-copy">Create your Vorta account using the invitation for <strong><?= htmlspecialchars($invite['email']) ?></strong>.</p>
+$layout = 'bare';
+$pageTitle = 'Accept invitation';
+include __DIR__ . '/../views/layout/start.php';
+?>
+<div class="w-full max-w-sm grid gap-6">
+  <div class="flex items-center justify-center gap-3">
+    <img src="images/vorta.png" alt="" class="size-10 object-contain">
+    <span class="text-[18px] font-extrabold">Vorta</span>
+  </div>
+
+  <?php if (!$invite): ?>
+    <div class="card card-body grid gap-3">
+      <h1 class="text-[20px] font-bold m-0">Invitation unavailable</h1>
+      <p class="m-0 text-muted">This invitation is invalid, expired, or has already been accepted. Ask your company administrator for a new link.</p>
+    </div>
+    <p class="text-center text-[13px] m-0"><a href="index.php" class="link">Back to sign in</a></p>
+  <?php else: ?>
+    <form method="post" class="card card-body grid gap-4">
+      <?= csrf_field() ?>
+      <input type="hidden" name="token" value="<?= e($token) ?>">
+      <div>
+        <h1 class="text-[20px] font-bold m-0">Join your company</h1>
+        <p class="m-0 mt-1 text-muted text-[13px]">Create your Vorta account using the invitation for <strong class="text-ink break-all"><?= e($invite['email']) ?></strong>.</p>
+      </div>
+
       <?php if ($error): ?>
-        <div class="account-alert account-alert--error"><?= htmlspecialchars($error) ?></div>
+        <?= alert_box('bad', $error) ?>
       <?php endif; ?>
-      <form method="post">
-        <?= csrf_field() ?>
-        <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
-        <div class="account-field">
-          <label class="account-label" for="invite-name">Your name</label>
-          <input class="account-input" id="invite-name" name="name" autocomplete="name" required autofocus>
+
+      <div class="field">
+        <label class="label" for="invite-name">Your name</label>
+        <input class="input" id="invite-name" name="name" autocomplete="name" required autofocus value="<?= e($_POST['name'] ?? '') ?>">
+      </div>
+      <div class="field">
+        <label class="label" for="invite-password">Password</label>
+        <div class="input-group">
+          <input class="input" id="invite-password" type="password" name="password" minlength="<?= ACCOUNT_MIN_PASSWORD_LENGTH ?>" autocomplete="new-password" required>
+          <button type="button" class="btn btn-ghost btn-sm" data-toggle-password="invite-password" aria-controls="invite-password" aria-pressed="false">Show</button>
         </div>
-        <div class="account-field">
-          <label class="account-label" for="invite-password">Password</label>
-          <input class="account-input" id="invite-password" type="password" name="password" minlength="<?= ACCOUNT_MIN_PASSWORD_LENGTH ?>" autocomplete="new-password" required>
-        </div>
-        <button class="account-submit" type="submit">Create account</button>
-      </form>
-      <p class="account-foot">Already have an account? <a href="index.php">Sign in</a></p>
-    <?php endif; ?>
-  </main>
-</body>
-</html>
+        <p class="help">At least <?= ACCOUNT_MIN_PASSWORD_LENGTH ?> characters.</p>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit">Create account</button>
+    </form>
+    <p class="text-center text-[13px] text-muted m-0">Already have an account? <a href="index.php" class="link">Sign in</a></p>
+  <?php endif; ?>
+</div>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>

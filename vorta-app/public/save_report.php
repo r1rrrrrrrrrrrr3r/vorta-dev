@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/ui.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/tenant.php';
 require_once __DIR__ . '/../lib/audit.php';
@@ -25,13 +26,16 @@ $workforce_id = (int)$_POST['workforce_id'];
 $allowedStatuses = ['Progress', 'Completed'];
 
 if (empty($title) || empty($report_date) || $job_type_id <= 0 || !in_array($status, $allowedStatuses, true)) {
+    http_response_code(422);
     die("Incomplete data.");
 }
 if ($proof_link !== null && !filter_var($proof_link, FILTER_VALIDATE_URL)) {
+    http_response_code(422);
     die("Proof link must be a valid URL.");
 }
 $proofScheme = $proof_link !== null ? strtolower((string)parse_url($proof_link, PHP_URL_SCHEME)) : '';
 if ($proof_link !== null && !in_array($proofScheme, ['http', 'https'], true)) {
+    http_response_code(422);
     die("Proof link must use HTTP or HTTPS.");
 }
 
@@ -40,6 +44,7 @@ $stmt_lookup->execute([$job_type_id, $company_id]);
 $job_type_row = $stmt_lookup->fetch();
 
 if (!$job_type_row) {
+    http_response_code(422);
     die("Invalid job type.");
 }
 $job_type = $job_type_row['name'];
@@ -49,6 +54,7 @@ $employeeStmt->execute([$user_id, $company_id]);
 $employee = $employeeStmt->fetch();
 
 if (!$employee) {
+    http_response_code(422);
     die("Employee data not found.");
 }
 
@@ -57,6 +63,7 @@ $employee_id = $employee['employee_id'];
 $check = $pdo->prepare("SELECT 1 FROM work_force WHERE workforce_id = ? AND company_id = ?");
 $check->execute([$workforce_id, $company_id]);
 if (!$check->fetch()) {
+    http_response_code(422);
     die("Invalid workforce.");
 }
 
@@ -64,6 +71,7 @@ $proof_image_path = null;
 if (isset($_FILES['proof_image'])) {
     $upload = upload_save_image($_FILES['proof_image'], $company_id);
     if (!$upload['ok']) {
+        http_response_code(422);
         die($upload['message']);
     }
     $proof_image_path = $upload['path'];
@@ -71,7 +79,7 @@ if (isset($_FILES['proof_image'])) {
 
 try {
     $stmt = $pdo->prepare("
-        INSERT INTO production_reports 
+        INSERT INTO production_reports
         (company_id, user_id, report_date, job_type, title, description, status, proof_link, proof_image, workforce_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
@@ -85,13 +93,14 @@ try {
         $status,
         $proof_link,
         $proof_image_path,
-        $workforce_id 
+        $workforce_id
     ]);
     audit_log($pdo, 'report.created', 'production_reports', $pdo->lastInsertId(), [
         'workforce_id' => $workforce_id,
     ]);
 
-    header("Location: my_reports.php?success=report_saved");
+    flash_set('ok', 'Report saved');
+    header("Location: my_reports.php", true, 303);
     exit;
 } catch (PDOException $e) {
     error_log('Failed to save report: ' . $e->getMessage());

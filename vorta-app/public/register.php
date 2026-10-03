@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/tenant.php';
+require_once __DIR__ . '/../lib/ui.php';
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -45,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$companyId, 'monthly_target_max', '88']);
             $stmt->execute([$companyId, 'daily_min_reports', '2']);
             $pdo->commit();
-            header('Location: index.php?registered=1');
+            header('Location: index.php?registered=1', true, 303);
             exit;
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -55,59 +56,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+if ($error !== '') {
+    http_response_code(422);
+}
+
+$layout = 'bare';
+$pageTitle = 'Create company';
+include __DIR__ . '/../views/layout/start.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Create company - Vorta Prodtracker</title>
-  <link rel="stylesheet" href="css/output.css">
-  <?php include __DIR__ . '/ui_head.php'; ?>
-</head>
-<body class="account-shell">
-  <main class="account-card">
-    <div class="account-brand">
-      <img src="../images/vorta.png" alt="Vorta">
-      <div>
-        <div class="account-brand-name">Vorta Prodtracker</div>
-        <div class="account-brand-sub">Productivity System</div>
+<div class="w-full max-w-sm grid gap-6">
+  <div class="flex items-center justify-center gap-3">
+    <img src="images/vorta.png" alt="" class="size-10 object-contain">
+    <span class="text-[18px] font-extrabold">Vorta</span>
+  </div>
+
+  <form method="post" class="card card-body grid gap-4">
+    <?= csrf_field() ?>
+    <div>
+      <h1 class="text-[20px] font-bold m-0">Create your company</h1>
+      <p class="m-0 mt-1 text-muted text-[13px]">Set up your workspace and administrator account.</p>
+    </div>
+
+    <?php if ($error): ?>
+      <?= alert_box('bad', $error) ?>
+    <?php endif; ?>
+
+    <div class="field">
+      <label class="label" for="company_name">Company name</label>
+      <input class="input" id="company_name" name="company_name" required autofocus autocomplete="organization"
+        value="<?= e($_POST['company_name'] ?? '') ?>" placeholder="Acme Studio">
+    </div>
+    <div class="field">
+      <label class="label" for="name">Your name</label>
+      <input class="input" id="name" name="name" required autocomplete="name"
+        value="<?= e($_POST['name'] ?? '') ?>" placeholder="Jane Doe">
+    </div>
+    <div class="field">
+      <label class="label" for="email">Work email</label>
+      <input class="input" id="email" type="email" name="email" required autocomplete="email"
+        value="<?= e($_POST['email'] ?? '') ?>" placeholder="you@company.com">
+    </div>
+    <div class="field">
+      <label class="label" for="password">Password</label>
+      <div class="input-group">
+        <input class="input" id="password" type="password" name="password" minlength="<?= ACCOUNT_MIN_PASSWORD_LENGTH ?>" required autocomplete="new-password"
+          placeholder="At least <?= ACCOUNT_MIN_PASSWORD_LENGTH ?> characters">
+        <button type="button" class="btn btn-ghost btn-sm" data-toggle-password="password" aria-controls="password" aria-pressed="false">Show</button>
       </div>
     </div>
 
-    <h1 class="account-title">Create your company</h1>
-    <p class="account-copy">Set up your workspace and administrator account.</p>
+    <button class="btn btn-primary btn-block" type="submit">Create company</button>
+  </form>
 
-    <?php if ($error): ?>
-      <div class="account-alert account-alert--error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-
-    <form method="post">
-      <?= csrf_field() ?>
-      <div class="account-field">
-        <label class="account-label" for="company_name">Company name</label>
-        <input class="account-input" id="company_name" name="company_name" required autofocus
-          value="<?= htmlspecialchars($_POST['company_name'] ?? '') ?>" placeholder="Acme Studio">
-      </div>
-      <div class="account-field">
-        <label class="account-label" for="name">Your name</label>
-        <input class="account-input" id="name" name="name" required
-          value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" placeholder="Jane Doe">
-      </div>
-      <div class="account-field">
-        <label class="account-label" for="email">Work email</label>
-        <input class="account-input" id="email" type="email" name="email" required
-          value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="you@company.com">
-      </div>
-      <div class="account-field">
-        <label class="account-label" for="password">Password</label>
-        <input class="account-input" id="password" type="password" name="password" minlength="6" required
-          placeholder="At least 6 characters">
-      </div>
-      <button class="account-submit" type="submit">Create company</button>
-    </form>
-
-    <p class="account-foot">Already have an account? <a href="index.php">Sign in</a></p>
-  </main>
-</body>
-</html>
+  <p class="text-center text-[13px] text-muted m-0">Already have an account? <a href="index.php" class="link">Sign in</a></p>
+</div>
+<?php include __DIR__ . '/../views/layout/end.php'; ?>
