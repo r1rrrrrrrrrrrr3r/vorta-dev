@@ -153,7 +153,9 @@
   .sidebar-user .menu { bottom: calc(100% + 6px); left: 0; right: 0; }
   .sidebar-scrim { position: fixed; inset: 0; background: var(--vt-scrim); z-index: 45; }
   @media (min-width: 1024px) { .sidebar-scrim { display: none !important; } }
-  .app-main { min-height: 100vh; }
+  /* overflow-x: clip keeps wide content (tables, chart labels) from widening the mobile
+     layout viewport, which would push the fixed tabbar/FAB below the fold. */
+  .app-main { min-height: 100vh; overflow-x: clip; }
   @media (min-width: 1024px) { .app-main { padding-left: 240px; } }
   .topbar {
     position: sticky; top: 0; height: 56px; background: var(--vt-surface); border-bottom: 1px solid var(--vt-line);
@@ -177,6 +179,8 @@
       background: var(--vt-surface); border-top: 1px solid var(--vt-line); padding-bottom: env(safe-area-inset-bottom);
     }
     .has-tabbar .page { padding-bottom: 96px; }
+    /* Staff navigate via the tabbar on mobile, so no hamburger/sidebar there. */
+    .has-tabbar .sidebar, .has-tabbar .sidebar-scrim, .has-tabbar [data-sidebar-open] { display: none !important; }
   }
   .tabbar-item { display: grid; justify-items: center; gap: 2px; padding: 8px 0 6px; font-size: 11px; font-weight: 600; color: var(--vt-muted); text-decoration: none; }
   .tabbar-item svg { width: 20px; height: 20px; }

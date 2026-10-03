@@ -120,7 +120,7 @@ include __DIR__ . '/../views/layout/start.php';
           <tr>
             <th>Date</th>
             <th>Title</th>
-            <th>Work force</th>
+            <th class="max-sm:hidden">Work force</th>
             <th>Status</th>
             <th class="col-actions"><span class="sr-only">Actions</span></th>
           </tr>
@@ -134,11 +134,11 @@ include __DIR__ . '/../views/layout/start.php';
               data-drawer-title="<?= e($r['title']) ?>" data-drawer-eyebrow="Report">
               <td class="whitespace-nowrap"><?= e(fmt_date($r['report_date'], 'short')) ?></td>
               <td><span class="cell-strong"><?= e($r['title']) ?></span><span class="cell-sub"><?= e($r['job_type']) ?></span></td>
-              <td><?= e($r['workforce_name'] ?? '–') ?></td>
+              <td class="max-sm:hidden"><?= e($r['workforce_name'] ?? '–') ?></td>
               <td class="whitespace-nowrap" data-status-cell>
                 <?= status_pill($r['status']) ?>
                 <?php if (!$isDone): ?>
-                  <button type="button" class="link text-[13px] ml-2" data-mark-done="<?= $id ?>">Mark completed</button>
+                  <button type="button" class="link text-[13px] block mt-1 sm:inline sm:mt-0 sm:ml-2" data-mark-done="<?= $id ?>">Mark completed</button>
                 <?php endif; ?>
               </td>
               <td class="col-actions">
